@@ -1,84 +1,96 @@
 # BUILD STATE
 
-## Fase atual: 3 / 6 — CONCLUÍDA. Iniciando Fase 4.
+## Fase atual: 4 / 6 — CONCLUÍDA. Iniciando Fase 5.
 
 ## Última ação
-Fase 3 (exercícios + engine de comparação) completa:
-- Migrations `exercises` e `attempts` aplicadas (schema_migrations em v4).
-- Seed de 10 exercícios (dias 1-3: saudação, apresentação, konbini) confirmado via `psql` dentro do
-  container `postgres` — 10 linhas, categorias e sprint_day_ref corretos.
-- `internal/comparison`: engine pura (normalização NFKC + remoção de espaços, Levenshtein a nível de
-  rune com backtrace de operações, verdict PASS/≥0.85 · PARTIAL/0.6-0.85 · FAIL/<0.6, phonetic_diff
-  classificando H_ASPIRADO_OMITIDO, VOGAL_ENGOLIDA, R_L_T_CONFUSAO, OUTRO).
-- TDD seguido literalmente: suite escrita primeiro (RED — `go test` falhou por pacote inexistente),
-  depois implementação até GREEN. 13 testes cobrindo os 3 padrões fonéticos + fallback OUTRO
-  (substituição e inserção não reconhecidas) + limiares exatos de verdict (0.85 e 0.6) + casos de borda
-  (ambos vazios, actual vazio) + normalização (espaços, kana de meia-largura).
-- Suite Go completa (`go test ./...`) passando: 25 testes no total (12 de auth/middleware + 13 de
-  comparison).
+Fase 4 (attempts end-to-end) completa e verificada via curl com **áudio real** (`mic_input.wav`) contra
+o `core-api` completo (`docker compose up stt-service postgres core-api`):
+- `GET /exercises` sem token → 401; com token → 200, lista filtrável por `sprint_day`/`category`/`difficulty`.
+- `POST /exercises/{id}/attempts` sem arquivo → 400; com `audio=@mic_input.wav` → 201, integrando
+  stt-service (transcrição real) → `comparison.Compare` → persistência em `attempts` → resposta
+  `{transcript, score, verdict, diff, xp_gained}`.
+- `GET /exercises/{id}/attempts` → 200, histórico do usuário retornado em `snake_case`.
+- Suite Go completa (`go test ./...`) passando: 34 testes no total (auth/middleware/comparison + 4 novos
+  de `sttclient` com servidor HTTP fake + 5 novos de `attempts.Service` com repo/transcriber/exercise
+  finder fakes).
 
-## Decisões técnicas tomadas (e por quê)
+## Achado real do teste com áudio (não hipotético)
+O `mic_input.wav` de laboratório contém uma auto-apresentação em japonês, mas o Whisper transcreveu em
+**katakana** (`ホタシノナマワ...`) um enunciado que corresponderia, no gabarito do exercício, a
+**hiragana** (`わたしのなまえは...`). `comparison.normalize` só aplica NFKC + remoção de espaço — não
+converte katakana↔hiragana — então várias moras viraram `SUBSTITUTE`/`OUTRO` mesmo sendo foneticamente
+equivalentes (た/タ, し/シ, の/ノ são a mesma sílaba em scripts diferentes). Isso infla artificialmente a
+distância de edição e derruba o score. Registrado como débito técnico abaixo — não corrigido nesta fase
+pra não expandir escopo do commit, mas é a próxima melhoria de precisão mais importante da engine.
+
+## Decisões técnicas — Fase 4
+- **Campo do multipart em `POST /exercises/{id}/attempts` é `audio`**, diferente do `file` usado
+  internamente pelo `stt-service`. A Sec. 4 do CLAUDE.md só diz "multipart: audio file" sem nomear o
+  campo; escolhido `audio` por ser mais descritivo na API pública; `sttclient` internamente sempre manda
+  `file` pro stt-service, então a escolha é só da fronteira pública do core-api.
+- **XP mínimo por veredito (PASS=10, PARTIAL=5, FAIL=1), hardcoded em `attempts.xpFor`** — só fecha o
+  contrato de resposta (`xp_gained`) da Sec. 4. Gamificação completa (streak, multiplicadores, badges) é
+  escopo da Fase 6 e vai substituir essa fórmula.
+- **`attempts.Service` depende de interfaces (`Transcriber`, `ExerciseFinder`), não dos tipos concretos
+  `sttclient.Client`/`exercises.PostgresRepository`** — permite testar a lógica de orquestração
+  (transcrever → comparar → persistir → calcular XP) com fakes em memória, sem subir stt-service nem
+  Postgres nos testes unitários.
+- **Todas as rotas exceto `/auth/*` exigem Bearer token**, incluindo `GET /exercises` — leitura literal
+  da Sec. 4 do CLAUDE.md ("Todas as rotas exceto /auth/* exigem..."), mesmo sendo dado não-sensível.
+- **`GET /exercises/{id}/attempts` retorna todo o histórico do usuário pra aquele exercício sem
+  paginação** — volume esperado é baixo (dezenas de tentativas por usuário/exercício no curso de 60
+  dias); paginação vira débito técnico só se isso mudar.
+
+## Decisões técnicas — Fase 3
 - **Padrões fonéticos implementados como classificação heurística por conjunto de moras, não ML/NLP.**
   `H_ASPIRADO_OMITIDO`: deleção de mora do は行 (は/ひ/ふ/へ/ほ). `VOGAL_ENGOLIDA`: deleção de vogal pura
   (あ/い/う/え/お). `R_L_T_CONFUSAO`: substituição entre ら行 e た/だ行 (flap japonês percebido/pronunciado
-  como L/T/D por falante de PT-BR). Qualquer coisa fora desses três grupos (incluindo toda inserção,
-  já que não há um padrão fonético conhecido pra "mora extra alucinada") cai em `OUTRO`, conforme
-  Sec. 3 do CLAUDE.md.
+  como L/T/D por falante de PT-BR). Qualquer coisa fora desses três grupos (incluindo toda inserção, já
+  que não há um padrão fonético conhecido pra "mora extra alucinada") cai em `OUTRO`, conforme Sec. 3.
 - **`phonetic_diff` é reconstruído via backtrace da matriz de Levenshtein**, não um diff ingênuo — dá
-  alinhamento correto posição-a-posição mesmo com inserção/deleção combinadas, condição necessária pra
-  classificar cada divergência individualmente.
-- **Seed de exercícios entrou como migration versionada (`0004_seed...`), não como script Go avulso** —
-  roda automaticamente no boot do `core-api` junto das migrations de schema, mesma pipeline, sem passo
-  manual extra.
-- **`exercises`/`attempts` ainda não têm repositório Go nem endpoints HTTP** — só o schema+seed foram
-  entregues nesta fase, conforme escopo da Sec. 5 do CLAUDE.md ("Fase 3: schema de exercises... engine
-  de comparação"). Repositório, `GET /exercises`, e `POST /exercises/{id}/attempts` ficam pra Fase 4
-  ("Attempts end-to-end"), que também integra o `sttclient` e o `comparison` recém-criado.
+  alinhamento correto posição-a-posição mesmo com inserção/deleção combinadas.
+- **Seed de exercícios entrou como migration versionada (`0004_seed...`)** — roda automaticamente no
+  boot do `core-api` junto das migrations de schema, mesma pipeline, sem passo manual extra.
+- TDD seguido literalmente no `comparison`: suite escrita primeiro (RED — `go test` falhou por pacote
+  inexistente), depois implementação até GREEN.
 
-## Decisões técnicas tomadas nas fases anteriores (e por quê)
-- **Porta do stt-service: 8001 (host), não 8000.** O projeto irmão `ascend` já usa 8000 (web), 9000 (api),
-  5432 (postgres) e 6379 (redis) no Docker local.
-- **postgres do yamabiko: porta 5433 (host); core-api: porta 9001 (host)** — mesma razão: evitar colisão
-  com os containers do Ascend (`ascend-postgres-1` em 5432, `ascend-api-1` em 9000).
-- **Redis ainda não entrou no docker-compose.yml** — nada em auth (Fase 2) precisa dele. Vai entrar
-  quando alguma feature concreta exigir (ex: blacklist de refresh token, rate limiting, cache de sessão).
-  Evita infra ociosa sem uso real.
-- **Migrations rodadas automaticamente no boot do `core-api`** via `golang-migrate/migrate` (lib pura Go,
-  sem precisar de CLI externa no container) — `internal/db/migrate.go`, chamado no início de `main()`
-  antes de abrir o pool de conexões da aplicação.
+## Decisões técnicas — Fases 1-2
+- **Porta do stt-service: 8001 (host); postgres: 5433; core-api: 9001.** O projeto irmão `ascend` já usa
+  8000 (web), 9000 (api), 5432 (postgres) e 6379 (redis) no Docker local.
+- **Redis ainda não entrou no docker-compose.yml** — nenhuma feature construída até agora precisa dele.
+  Vai entrar quando algo concreto exigir (blacklist de refresh token, rate limiting, cache de sessão).
+- **Migrations rodadas automaticamente no boot do `core-api`** via `golang-migrate/migrate`, chamado no
+  início de `main()` antes de abrir o pool de conexões.
 - **JWT: dois tipos de token (`access`/`refresh`) discriminados por claim `type`, mesma secret HS256.**
-  `Parse` exige o tipo esperado — um refresh token não passa como access token no middleware, e
-  vice-versa (coberto em `middleware/auth_test.go` e `jwt_test.go`).
-- **`POST /auth/refresh` retorna só `{access_token}`, sem rotacionar o refresh token** — segue literal o
-  contrato da Sec. 4 do CLAUDE.md (`{refresh_token} -> {access_token}`). Rotação de refresh token (mais
-  seguro contra replay) fica como débito técnico abaixo.
-- **`GET /users/me` existe já na Fase 2, mas devolve só `{id}`** — não é a rota completa da Sec. 4
-  (perfil + sprint + XP + streak), que depende de `users`/`gamification` (Fases 3/6). Serve aqui só de
-  prova end-to-end de que o middleware de auth funciona; será expandida quando esses domínios existirem.
-- **Repositório de users com interface (`UserRepository`) + implementação Postgres via `pgx/v5`** —
-  arquitetura hexagonal leve (handler → service → repositório) conforme Sec. 9 do CLAUDE.md; testes de
-  `Service` usam um fake repo em memória, não batem no Postgres.
+- **`POST /auth/refresh` retorna só `{access_token}`, sem rotacionar o refresh token** — literal ao
+  contrato da Sec. 4. Rotação fica como débito técnico.
+- **`GET /users/me` devolve só `{id}`** — não é a rota completa da Sec. 4 (perfil + sprint + XP +
+  streak), que depende de domínios ainda não construídos. Prova só que o middleware de auth funciona.
+- **Repositórios com interface + implementação Postgres via `pgx/v5`** — arquitetura hexagonal leve
+  (handler → service → repositório); testes de serviço usam fakes em memória, não batem no Postgres.
 
 ## Débito técnico conhecido
+- **`comparison.normalize` não converte katakana↔hiragana** — ver "Achado real" acima. Causa scores
+  artificialmente baixos quando o Whisper transcreve num script diferente do gabarito. Próxima melhoria
+  de precisão mais importante da engine.
 - Nenhum HF_TOKEN configurado no stt-service — download do modelo usa rate limit anônimo do Hugging Face
-  Hub (mais lento, mas funcional).
-- `stt-service` não tem teste de integração real com o modelo carregado — só smoke test manual via curl
-  (documentado na entrada da Fase 1 abaixo).
+  Hub.
+- `stt-service` não tem teste de integração automatizado com o modelo real — só smoke test manual via
+  curl (documentado no histórico da Fase 1).
 - `.gitignore` ignora `*.wav`/`*.mp3` globalmente — arquivos de laboratório continuam soltos no working
   tree, não commitados.
-- **Refresh token não é revogável nem rotacionado** — um refresh token vazado continua válido até expirar
-  (7 dias). Sem blacklist/allowlist em Redis ainda. Resolver quando Redis entrar no projeto.
-- **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento (`dev-secret-troque-em-producao`)** —
-  ok para ambiente local, precisa virar secret de verdade antes de qualquer deploy.
-- **Sem rate limiting em `/auth/login` e `/auth/register`** — vulnerável a brute-force/enumeração de
-  e-mail por ora. Endereçar quando houver infra de Redis/rate limit no projeto.
+- **Refresh token não é revogável nem rotacionado** — sem blacklist/allowlist em Redis ainda.
+- **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento** — ok local, precisa virar secret
+  de verdade antes de qualquer deploy.
+- **Sem rate limiting em `/auth/login`, `/auth/register`** — vulnerável a brute-force/enumeração de
+  e-mail por ora.
+- **XP hardcoded por verdict** (Fase 4) — será substituído pela gamificação real na Fase 6.
+- **`GET /exercises/{id}/attempts` sem paginação.**
 
 ## Próximo passo imediato
-Fase 4 — Attempts end-to-end: repositório Go de `exercises` (GET /exercises, GET /exercises/{id}) e de
-`attempts`, `sttclient` (HTTP interno pro stt-service), `POST /exercises/{id}/attempts` (multipart:
-audio) integrando stt-service → comparison → persistência do attempt, com XP mínimo (fórmula simples
-por verdict; gamificação completa com streak/badges é Fase 6). Validar fluxo completo via curl antes de
-tocar no frontend.
+Fase 5 — Web (React + TypeScript + Vite): telas de login/registro, lista de exercícios, tela de
+exercício com gravador (`MediaRecorder` API nativa, sem libs pesadas), dashboard de progresso. Consumir
+a API já pronta (`/auth/*`, `/exercises`, `/exercises/{id}/attempts`) rodando em `http://localhost:9001`.
 
 ---
 
