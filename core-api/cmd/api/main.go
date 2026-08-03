@@ -10,10 +10,14 @@ import (
 	"github.com/yamabiko/core-api/internal/attempts"
 	"github.com/yamabiko/core-api/internal/auth"
 	"github.com/yamabiko/core-api/internal/config"
+	"github.com/yamabiko/core-api/internal/dashboard"
 	"github.com/yamabiko/core-api/internal/db"
 	"github.com/yamabiko/core-api/internal/exercises"
 	"github.com/yamabiko/core-api/internal/httpserver"
+	"github.com/yamabiko/core-api/internal/phonetics"
+	"github.com/yamabiko/core-api/internal/srs"
 	"github.com/yamabiko/core-api/internal/sttclient"
+	"github.com/yamabiko/core-api/internal/users"
 )
 
 func main() {
@@ -41,12 +45,18 @@ func main() {
 	exercisesRepo := exercises.NewPostgresRepository(pool)
 	exercisesHandler := exercises.NewHandler(exercisesRepo)
 
+	srsRepo := srs.NewPostgresRepository(pool)
+	phoneticsRepo := phonetics.NewPostgresRepository(pool)
+	usersRepo := users.NewPostgresRepository(pool)
+	usersHandler := users.NewHandler(usersRepo, srsRepo, phoneticsRepo, exercisesRepo)
+	dashboardHandler := dashboard.NewHandler(phoneticsRepo)
+
 	sttClient := sttclient.New(cfg.STTServiceURL)
 	attemptsRepo := attempts.NewPostgresRepository(pool)
-	attemptsService := attempts.NewService(attemptsRepo, sttClient, exercisesRepo)
+	attemptsService := attempts.NewService(attemptsRepo, sttClient, exercisesRepo, srsRepo, usersRepo, phoneticsRepo)
 	attemptsHandler := attempts.NewHandler(attemptsService)
 
-	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler)
+	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler)
 
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {

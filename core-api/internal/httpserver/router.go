@@ -8,8 +8,10 @@ import (
 
 	"github.com/yamabiko/core-api/internal/attempts"
 	"github.com/yamabiko/core-api/internal/auth"
+	"github.com/yamabiko/core-api/internal/dashboard"
 	"github.com/yamabiko/core-api/internal/exercises"
 	appmiddleware "github.com/yamabiko/core-api/internal/middleware"
+	"github.com/yamabiko/core-api/internal/users"
 )
 
 func NewRouter(
@@ -17,6 +19,8 @@ func NewRouter(
 	tokens *auth.JWTIssuer,
 	exercisesHandler *exercises.Handler,
 	attemptsHandler *attempts.Handler,
+	usersHandler *users.Handler,
+	dashboardHandler *dashboard.Handler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
@@ -37,7 +41,10 @@ func NewRouter(
 	r.Group(func(r chi.Router) {
 		r.Use(appmiddleware.RequireAuth(tokens))
 
-		r.Get("/users/me", meHandler)
+		r.Route("/users/me", func(r chi.Router) {
+			r.Get("/", usersHandler.Me)
+			r.Get("/progress", usersHandler.Progress)
+		})
 
 		r.Route("/exercises", func(r chi.Router) {
 			r.Get("/", exercisesHandler.List)
@@ -45,15 +52,9 @@ func NewRouter(
 			r.Post("/{id}/attempts", attemptsHandler.Submit)
 			r.Get("/{id}/attempts", attemptsHandler.History)
 		})
+
+		r.Get("/dashboard/heatmap", dashboardHandler.Heatmap)
 	})
 
 	return r
-}
-
-// meHandler prova que o middleware de auth funciona ponta a ponta.
-// Perfil completo (XP, streak, sprint) chega na Fase 3+ junto do domínio de users.
-func meHandler(w http.ResponseWriter, r *http.Request) {
-	userID, _ := appmiddleware.UserIDFromContext(r.Context())
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"id":"` + userID.String() + `"}`))
 }

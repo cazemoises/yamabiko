@@ -23,11 +23,12 @@ func NewHandler(service *Service) *Handler {
 }
 
 type submitResponse struct {
-	Transcript string  `json:"transcript"`
-	Score      float64 `json:"score"`
-	Verdict    string  `json:"verdict"`
-	Diff       any     `json:"diff"`
-	XPGained   int     `json:"xp_gained"`
+	Transcript   string   `json:"transcript"`
+	Score        float64  `json:"score"`
+	Verdict      string   `json:"verdict"`
+	Diff         any      `json:"diff"`
+	XPGained     int      `json:"xp_gained"`
+	BadgesGained []string `json:"badges_gained,omitempty"`
 }
 
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +65,18 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	badges := make([]string, len(result.NewBadges))
+	for i, badge := range result.NewBadges {
+		badges[i] = string(badge)
+	}
+
 	writeJSON(w, http.StatusCreated, submitResponse{
-		Transcript: result.Transcript,
-		Score:      result.Score,
-		Verdict:    string(result.Verdict),
-		Diff:       result.Diff,
-		XPGained:   result.XPGained,
+		Transcript:   result.Transcript,
+		Score:        result.Score,
+		Verdict:      string(result.Verdict),
+		Diff:         result.Diff,
+		XPGained:     result.XPGained,
+		BadgesGained: badges,
 	})
 }
 
