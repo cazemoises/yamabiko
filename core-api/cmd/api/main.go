@@ -56,7 +56,7 @@ func main() {
 	attemptsService := attempts.NewService(attemptsRepo, sttClient, exercisesRepo, srsRepo, usersRepo, phoneticsRepo)
 	attemptsHandler := attempts.NewHandler(attemptsService)
 
-	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler)
+	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, cfg.CORSAllowedOrigins)
 
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
