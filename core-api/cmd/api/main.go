@@ -7,10 +7,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yamabiko/core-api/internal/attempts"
 	"github.com/yamabiko/core-api/internal/auth"
 	"github.com/yamabiko/core-api/internal/config"
 	"github.com/yamabiko/core-api/internal/db"
+	"github.com/yamabiko/core-api/internal/exercises"
 	"github.com/yamabiko/core-api/internal/httpserver"
+	"github.com/yamabiko/core-api/internal/sttclient"
 )
 
 func main() {
@@ -30,12 +33,20 @@ func main() {
 	}
 	defer pool.Close()
 
-	repo := auth.NewPostgresRepository(pool)
+	authRepo := auth.NewPostgresRepository(pool)
 	issuer := auth.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
-	service := auth.NewService(repo, issuer)
-	handler := auth.NewHandler(service)
+	authService := auth.NewService(authRepo, issuer)
+	authHandler := auth.NewHandler(authService)
 
-	router := httpserver.NewRouter(handler, issuer)
+	exercisesRepo := exercises.NewPostgresRepository(pool)
+	exercisesHandler := exercises.NewHandler(exercisesRepo)
+
+	sttClient := sttclient.New(cfg.STTServiceURL)
+	attemptsRepo := attempts.NewPostgresRepository(pool)
+	attemptsService := attempts.NewService(attemptsRepo, sttClient, exercisesRepo)
+	attemptsHandler := attempts.NewHandler(attemptsService)
+
+	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler)
 
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {

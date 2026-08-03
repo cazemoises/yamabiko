@@ -6,11 +6,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
+	"github.com/yamabiko/core-api/internal/attempts"
 	"github.com/yamabiko/core-api/internal/auth"
+	"github.com/yamabiko/core-api/internal/exercises"
 	appmiddleware "github.com/yamabiko/core-api/internal/middleware"
 )
 
-func NewRouter(authHandler *auth.Handler, tokens *auth.JWTIssuer) http.Handler {
+func NewRouter(
+	authHandler *auth.Handler,
+	tokens *auth.JWTIssuer,
+	exercisesHandler *exercises.Handler,
+	attemptsHandler *attempts.Handler,
+) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
@@ -26,9 +33,18 @@ func NewRouter(authHandler *auth.Handler, tokens *auth.JWTIssuer) http.Handler {
 		r.Post("/refresh", authHandler.Refresh)
 	})
 
+	// Todas as rotas abaixo exigem Authorization: Bearer {access_token} (Sec. 4 do CLAUDE.md).
 	r.Group(func(r chi.Router) {
 		r.Use(appmiddleware.RequireAuth(tokens))
+
 		r.Get("/users/me", meHandler)
+
+		r.Route("/exercises", func(r chi.Router) {
+			r.Get("/", exercisesHandler.List)
+			r.Get("/{id}", exercisesHandler.Get)
+			r.Post("/{id}/attempts", attemptsHandler.Submit)
+			r.Get("/{id}/attempts", attemptsHandler.History)
+		})
 	})
 
 	return r

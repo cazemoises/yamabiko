@@ -30,9 +30,12 @@ services:
       - DATABASE_URL=postgres://yamabiko:yamabiko@postgres:5432/yamabiko?sslmode=disable
       - JWT_SECRET=dev-secret-troque-em-producao
       - PORT=8080
+      - STT_SERVICE_URL=http://stt-service:8000
     depends_on:
       postgres:
         condition: service_healthy
+      stt-service:
+        condition: service_started
 
 volumes:
   whisper-models:

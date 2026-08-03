@@ -12,6 +12,7 @@ type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	STTServiceURL   string
 }
 
 func Load() (*Config, error) {
@@ -25,6 +26,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("DATABASE_URL não configurado")
 	}
 
+	sttServiceURL := os.Getenv("STT_SERVICE_URL")
+	if sttServiceURL == "" {
+		return nil, fmt.Errorf("STT_SERVICE_URL não configurado")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -36,5 +42,6 @@ func Load() (*Config, error) {
 		JWTSecret:       secret,
 		AccessTokenTTL:  15 * time.Minute,
 		RefreshTokenTTL: 7 * 24 * time.Hour,
+		STTServiceURL:   sttServiceURL,
 	}, nil
 }
