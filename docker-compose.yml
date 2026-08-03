@@ -1,0 +1,10 @@
+services:
+  stt-service:
+    build: ./stt-service
+    ports:
+      - "8001:8000"
+    volumes:
+      - whisper-models:/root/.cache/huggingface
+
+volumes:
+  whisper-models:
