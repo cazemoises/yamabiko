@@ -1,8 +1,26 @@
 # BUILD STATE
 
-## Fase atual: 4 / 6 — CONCLUÍDA. Iniciando Fase 5.
+## Fase atual: 5 / 6 — CONCLUÍDA COM RESSALVA (ver abaixo). Iniciando Fase 6.
 
 ## Última ação
+Fase 5 (web) implementada: Vite + React + TS em `web/`, com `src/lib` (cliente HTTP + storage de
+tokens), `src/features/auth` (login/registro + `AuthContext`), `src/features/exercises` (lista +
+tela de exercício com `MediaRecorder` nativo via `useAudioRecorder`), `src/features/dashboard`
+(progresso básico), roteamento protegido em `App.tsx`. `tsc -b && vite build` passa limpo, `oxlint`
+só acusa 1 warning de fast-refresh (não bloqueante). Servidor `vite dev` sobe e serve `index.html` e os
+módulos TSX corretamente (confirmado via curl).
+
+**RESSALVA IMPORTANTE**: esta sessão não tem uma ferramenta de browser disponível — não foi possível
+clicar pela UI, testar login/registro na prática, nem gravar áudio de verdade (`MediaRecorder` exige
+microfone real + gesto do usuário, que só existem num browser interativo). O que foi verificado:
+compilação TypeScript limpa, build de produção gerando bundle sem erro, e o dev server servindo os
+módulos corretamente. O que **não** foi verificado: comportamento real em runtime no browser. Antes de
+considerar a Fase 5 definitivamente fechada, rodar manualmente `cd web && npm run dev`, abrir
+`http://localhost:5173`, e percorrer o fluxo completo (registro → lista de exercícios → gravar e
+enviar tentativa → ver resultado → dashboard) com o `core-api`/`stt-service` rodando via
+`docker compose up`.
+
+## Última ação (Fase 4, histórico)
 Fase 4 (attempts end-to-end) completa e verificada via curl com **áudio real** (`mic_input.wav`) contra
 o `core-api` completo (`docker compose up stt-service postgres core-api`):
 - `GET /exercises` sem token → 401; com token → 200, lista filtrável por `sprint_day`/`category`/`difficulty`.
@@ -86,11 +104,26 @@ pra não expandir escopo do commit, mas é a próxima melhoria de precisão mais
   e-mail por ora.
 - **XP hardcoded por verdict** (Fase 4) — será substituído pela gamificação real na Fase 6.
 - **`GET /exercises/{id}/attempts` sem paginação.**
+- **Fase 5 (web) não foi testada interativamente num browser real** — ver ressalva na "Última ação"
+  acima. `npm run build`/`tsc` passam, mas fluxo de UI (cliques, MediaRecorder, telas renderizando com
+  dados reais) precisa de verificação manual do usuário antes de considerar a tela de exercício
+  confiável em produção.
+- **`react-router-dom@7.18.2` tem um advisory de severidade alta em aberto** (RSC Mode CSRF Bypass,
+  GHSA-qwww-vcr4-c8h2) — não aplicável aqui: este projeto não usa React Server Components nem Server
+  Actions, é SPA cliente puro consumindo API JSON própria. Versões anteriores da 7.x têm advisories
+  piores (XSS, open redirect) que também não se aplicam sem SSR, mas são mais numerosos — 7.18.2
+  (última da linha 7.x) foi a escolha com menor superfície de exposição real. Reavaliar se o projeto
+  algum dia adotar SSR/RSC.
+- **Dashboard não usa `GET /users/me/progress` nem `GET /dashboard/heatmap`** (Sec. 4) — esses endpoints
+  ainda não existem no backend (dependem de `phonetic_error_patterns`, escopo de Fase 6). O dashboard
+  atual busca `GET /exercises` + `GET /exercises/{id}/attempts` por exercício (N+1) só pra mostrar
+  progresso básico. Substituir por endpoints agregados quando `gamification`/`phonetics` existirem.
 
 ## Próximo passo imediato
-Fase 5 — Web (React + TypeScript + Vite): telas de login/registro, lista de exercícios, tela de
-exercício com gravador (`MediaRecorder` API nativa, sem libs pesadas), dashboard de progresso. Consumir
-a API já pronta (`/auth/*`, `/exercises`, `/exercises/{id}/attempts`) rodando em `http://localhost:9001`.
+Fase 6 — Gamificação + SRS: XP real (streak, badges, multiplicadores — substituindo o XP hardcoded da
+Fase 4), spaced repetition via SM-2 (`user_chunk_progress`), agregação de `phonetic_error_patterns` pra
+alimentar `GET /dashboard/heatmap` e `GET /users/me/progress`. Reaproveitar estética "Tactical
+Telemetry" (JetBrains Mono, badges bracket-style) — a base de fonte mono já foi adotada no CSS da Fase 5.
 
 ---
 
