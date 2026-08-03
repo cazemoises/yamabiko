@@ -39,15 +39,30 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
 }
 
 #root {
-  max-width: 720px;
-  margin: 0 auto;
   min-height: 100svh;
-  padding: 0 16px 48px;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 32px 16px;
+  box-sizing: border-box;
 }
 
 h1,
@@ -64,9 +79,12 @@ a {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 0;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+  box-sizing: border-box;
 }
 
 .navbar .brand {
@@ -79,13 +97,28 @@ a {
   text-decoration: none;
 }
 
+.auth-page {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .auth-page form,
 .exercise-page,
 .exercises-list,
 .dashboard-page {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.exercise-page,
+.exercises-list,
+.dashboard-page {
+  max-width: 600px;
 }
 
 label {
