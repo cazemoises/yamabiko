@@ -1,17 +1,41 @@
 # BUILD STATE
 
-## Fase atual: 2 / 6 — CONCLUÍDA. Iniciando Fase 3.
+## Fase atual: 3 / 6 — CONCLUÍDA. Iniciando Fase 4.
 
 ## Última ação
-Fase 2 (auth no core-api) completa e verificada end-to-end via `docker compose up postgres core-api`:
-- `POST /auth/register` → 201 + `{access_token, refresh_token}`.
-- `POST /auth/register` com email repetido → 409.
-- `POST /auth/login` com senha certa → 200 + tokens; com senha errada → 401.
-- `GET /users/me` sem token → 401; com access token válido → 200 `{id}`.
-- `POST /auth/refresh` com refresh token válido → 200 + novo `access_token`.
-- Suite Go (`go test ./...`) passando: 12 testes (auth service, JWT, password, middleware).
+Fase 3 (exercícios + engine de comparação) completa:
+- Migrations `exercises` e `attempts` aplicadas (schema_migrations em v4).
+- Seed de 10 exercícios (dias 1-3: saudação, apresentação, konbini) confirmado via `psql` dentro do
+  container `postgres` — 10 linhas, categorias e sprint_day_ref corretos.
+- `internal/comparison`: engine pura (normalização NFKC + remoção de espaços, Levenshtein a nível de
+  rune com backtrace de operações, verdict PASS/≥0.85 · PARTIAL/0.6-0.85 · FAIL/<0.6, phonetic_diff
+  classificando H_ASPIRADO_OMITIDO, VOGAL_ENGOLIDA, R_L_T_CONFUSAO, OUTRO).
+- TDD seguido literalmente: suite escrita primeiro (RED — `go test` falhou por pacote inexistente),
+  depois implementação até GREEN. 13 testes cobrindo os 3 padrões fonéticos + fallback OUTRO
+  (substituição e inserção não reconhecidas) + limiares exatos de verdict (0.85 e 0.6) + casos de borda
+  (ambos vazios, actual vazio) + normalização (espaços, kana de meia-largura).
+- Suite Go completa (`go test ./...`) passando: 25 testes no total (12 de auth/middleware + 13 de
+  comparison).
 
 ## Decisões técnicas tomadas (e por quê)
+- **Padrões fonéticos implementados como classificação heurística por conjunto de moras, não ML/NLP.**
+  `H_ASPIRADO_OMITIDO`: deleção de mora do は行 (は/ひ/ふ/へ/ほ). `VOGAL_ENGOLIDA`: deleção de vogal pura
+  (あ/い/う/え/お). `R_L_T_CONFUSAO`: substituição entre ら行 e た/だ行 (flap japonês percebido/pronunciado
+  como L/T/D por falante de PT-BR). Qualquer coisa fora desses três grupos (incluindo toda inserção,
+  já que não há um padrão fonético conhecido pra "mora extra alucinada") cai em `OUTRO`, conforme
+  Sec. 3 do CLAUDE.md.
+- **`phonetic_diff` é reconstruído via backtrace da matriz de Levenshtein**, não um diff ingênuo — dá
+  alinhamento correto posição-a-posição mesmo com inserção/deleção combinadas, condição necessária pra
+  classificar cada divergência individualmente.
+- **Seed de exercícios entrou como migration versionada (`0004_seed...`), não como script Go avulso** —
+  roda automaticamente no boot do `core-api` junto das migrations de schema, mesma pipeline, sem passo
+  manual extra.
+- **`exercises`/`attempts` ainda não têm repositório Go nem endpoints HTTP** — só o schema+seed foram
+  entregues nesta fase, conforme escopo da Sec. 5 do CLAUDE.md ("Fase 3: schema de exercises... engine
+  de comparação"). Repositório, `GET /exercises`, e `POST /exercises/{id}/attempts` ficam pra Fase 4
+  ("Attempts end-to-end"), que também integra o `sttclient` e o `comparison` recém-criado.
+
+## Decisões técnicas tomadas nas fases anteriores (e por quê)
 - **Porta do stt-service: 8001 (host), não 8000.** O projeto irmão `ascend` já usa 8000 (web), 9000 (api),
   5432 (postgres) e 6379 (redis) no Docker local.
 - **postgres do yamabiko: porta 5433 (host); core-api: porta 9001 (host)** — mesma razão: evitar colisão
@@ -50,10 +74,11 @@ Fase 2 (auth no core-api) completa e verificada end-to-end via `docker compose u
   e-mail por ora. Endereçar quando houver infra de Redis/rate limit no projeto.
 
 ## Próximo passo imediato
-Fase 3 — Exercícios + Comparação: schema de `exercises` e `attempts`, seed inicial com 5-10 exercícios
-dos dias 1-3 do sprint (saudação, auto-apresentação, konbini básico), engine de comparação
-(normalização + Levenshtein + verdict PASS/PARTIAL/FAIL + phonetic_diff) com testes unitários (TDD)
-cobrindo os padrões de erro fonético da Sec. 3 do CLAUDE.md (H aspirado, vogal engolida, R/L/T).
+Fase 4 — Attempts end-to-end: repositório Go de `exercises` (GET /exercises, GET /exercises/{id}) e de
+`attempts`, `sttclient` (HTTP interno pro stt-service), `POST /exercises/{id}/attempts` (multipart:
+audio) integrando stt-service → comparison → persistência do attempt, com XP mínimo (fórmula simples
+por verdict; gamificação completa com streak/badges é Fase 6). Validar fluxo completo via curl antes de
+tocar no frontend.
 
 ---
 
