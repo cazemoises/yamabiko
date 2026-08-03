@@ -139,9 +139,27 @@ func classifySubstitute(expected, actual rune) ErrorPattern {
 	return PatternOutro
 }
 
-// normalize remove todo espaço em branco e aplica NFKC — unifica formas de
-// compatibilidade Unicode (ex: katakana de meia-largura -> largura normal).
+// normalize remove todo espaço em branco, aplica NFKC (unifica formas de
+// compatibilidade Unicode, ex: katakana de meia-largura -> largura normal) e
+// converte katakana pra hiragana — o Whisper às vezes transcreve num script
+// diferente do gabarito pra sons foneticamente idênticos (achado real da Fase
+// 4/6, ver BUILD_STATE.md), o que não deveria contar como erro de pronúncia.
 func normalize(s string) string {
 	s = norm.NFKC.String(s)
-	return strings.Join(strings.Fields(s), "")
+	s = strings.Join(strings.Fields(s), "")
+	return katakanaToHiragana(s)
+}
+
+// katakanaToHiragana converte cada rune do bloco katakana (U+30A1-U+30F6) pro
+// hiragana correspondente (U+3041-U+3096) via deslocamento fixo de 0x60 — os
+// dois blocos são paralelos no Unicode. ー (prolongador de som, U+30FC) fica
+// de fora por não ter equivalente direto em hiragana.
+func katakanaToHiragana(s string) string {
+	runes := []rune(s)
+	for i, r := range runes {
+		if r >= 'ァ' && r <= 'ヶ' {
+			runes[i] = r - 0x60
+		}
+	}
+	return string(runes)
 }

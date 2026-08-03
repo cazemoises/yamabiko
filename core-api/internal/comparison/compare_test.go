@@ -32,6 +32,19 @@ func TestCompare_NormalizesWhitespace(t *testing.T) {
 	}
 }
 
+func TestCompare_NormalizesKatakanaToHiragana(t *testing.T) {
+	// Whisper às vezes transcreve em katakana um enunciado cujo gabarito está em
+	// hiragana (achado real da Fase 4/6) — mesma sílaba, script diferente.
+	result := comparison.Compare("わたしのなまえは", "ワタシノナマエハ")
+
+	if result.SimilarityScore != 1.0 {
+		t.Fatalf("esperava score 1.0 após normalizar katakana->hiragana, veio %v", result.SimilarityScore)
+	}
+	if len(result.PhoneticDiff) != 0 {
+		t.Fatalf("esperava diff vazio, veio %v", result.PhoneticDiff)
+	}
+}
+
 func TestCompare_NormalizesHalfWidthKana(t *testing.T) {
 	// "ｱﾘｶﾞﾄｳ" em katakana meia-largura deve normalizar (NFKC) pra "アリガトウ".
 	result := comparison.Compare("アリガトウ", "ｱﾘｶﾞﾄｳ")
