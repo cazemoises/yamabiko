@@ -1,8 +1,43 @@
 # BUILD STATE
 
-## Fase atual: 6 / 6 — CONCLUÍDA. Todas as fases do MVP entregues (com 1 ressalva, ver abaixo).
+## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+Corrigidos dois bugs reais encontrados na primeira verificação de browser de verdade do `web`
+(o item #1 do débito técnico anterior — nesta sessão consegui instalar Playwright via `npx` no
+scratchpad e rodar um browser Chromium de verdade, então a ressalva "não testado em browser" da Fase 5
+**caiu**):
+
+1. **CORS bloqueando o frontend** — `core-api` não tinha nenhum middleware de CORS; preflight `OPTIONS`
+   pra `/auth/register` vindo de `http://localhost:5173` voltava 405, então nenhuma chamada do `web`
+   funcionava. Adicionado `github.com/go-chi/cors` no router, origins permitidas configuráveis via
+   `CORS_ALLOWED_ORIGINS` (env var, default `http://localhost:5173` se não setada — produção seta a env
+   var com o domínio real). Testado via curl simulando preflight (`OPTIONS` com `Origin` +
+   `Access-Control-Request-Method`) antes e depois: 405→200 com os headers corretos; origin não
+   permitida não recebe `Access-Control-Allow-Origin` (bloqueio continua funcionando pro que não é
+   `localhost:5173`). Confirmado depois com login real no browser (Playwright) — zero erros de CORS no
+   console.
+2. **Telas do `web` não centralizadas** — `#root`/`main` não tinham `display:flex`+centralização; o
+   conteúdo (login, lista, exercício, dashboard) ficava colado no canto superior esquerdo da viewport.
+   Corrigido em `index.css`: `#root` virou flex-column com `min-height:100svh`; `main` (que envolve
+   todas as rotas em `App.tsx`) ganhou `flex:1; display:flex; align-items:center; justify-content:center`,
+   centralizando qualquer página tanto na horizontal quanto na vertical; cada container de página
+   (`.auth-page`, `.exercise-page`, `.exercises-list`, `.dashboard-page`) ganhou `width:100%` +
+   `max-width` (360px pro card de auth, 600px pras telas com mais conteúdo) pra não esticar full-bleed
+   num monitor grande.
+3. **Validação real de ponta a ponta, não só descrição visual**: subi `docker compose up` (stt-service +
+   postgres + core-api) e `npm run dev` no `web`, instalei Playwright/Chromium via `npx` no diretório de
+   scratchpad (não virou dependência do projeto), e rodei um script Node fazendo login de verdade
+   (`moises@example.com`) e navegando por `/login`, `/exercises`, `/exercises/{id}`, `/dashboard`, em
+   desktop (1280×800) e mobile (390×844). Resultado: **zero erros de console**, todas as 4 telas
+   centralizadas corretamente nos dois tamanhos, dashboard mostrando dados reais e coerentes com o que
+   eu já tinha validado via curl na Fase 6 (`2 de 10 exercícios tentados`, `FAIL 46%` no exercício de
+   auto-apresentação — mesmo score da correção de katakana/hiragana). Screenshots ficaram no diretório de
+   scratchpad da sessão (não commitados — são artefato de verificação, não parte do produto).
+4. Suite Go completa continua passando (`go test ./...`), `tsc -b && vite build` e `oxlint` continuam
+   limpos no `web`.
+
+## Última ação (Fase 6, histórico)
 Fase 6 (gamificação + SRS) completa e verificada via curl com **áudio real** contra o stack completo
 (`docker compose up stt-service postgres core-api`):
 - `internal/srs`: SM-2 puro (easiness factor, intervalo, repetições), **TDD literal** (RED confirmado
@@ -35,6 +70,20 @@ ferramenta de arquivo preserva UTF-8 corretamente. **Não é um bug no `core-api
 ambiente de teste (encoding do Git Bash/Windows ao passar string inline com acento pra um processo
 filho). Registrar como nota de processo pra quem for testar manualmente via terminal Windows: prefira
 `--data-binary @arquivo.json` a `-d '...com acento...'` inline.
+
+## Decisões técnicas — CORS + layout (pós-Fase 6)
+- **`CORS_ALLOWED_ORIGINS` é uma lista separada por vírgula, default `http://localhost:5173`** —
+  hardcoded como fallback pra não exigir configuração extra em dev local; produção deve sempre setar a
+  env var explicitamente com o(s) domínio(s) real(is) do `web` (a origin do stt-service/core-api interno
+  não precisa entrar aqui, CORS só importa pra chamadas partindo de um browser).
+- **`AllowCredentials: true` no CORS** — o `web` não usa cookies hoje (tokens vão em `Authorization:
+  Bearer`, guardados em `localStorage`), mas deixei habilitado porque é inofensivo com a whitelist de
+  origin explícita (CORS não permite `AllowCredentials:true` + `AllowedOrigins:["*"]` juntos por
+  design do browser, e aqui já não uso wildcard) e evita ter que mexer nisso de novo se algo migrar pra
+  cookie no futuro (ex: refresh token em cookie httpOnly).
+- **Centralização via `main` (flex, `align-items:center; justify-content:center`), não uma classe
+  aplicada individualmente em cada página** — garante que qualquer tela nova adicionada no futuro já
+  nasce centralizada por herdar o layout do `App.tsx`, sem precisar lembrar de replicar CSS por página.
 
 ## Decisões técnicas — Fase 6
 - **"Chunk" (Sec. 8 do CLAUDE.md) mapeia 1:1 pra `exercises.id`** — não existe uma unidade de
@@ -74,29 +123,29 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
 - `comparison`: Levenshtein a nível de rune com backtrace de operações; verdict PASS≥0.85/PARTIAL≥0.6/
   FAIL<0.6; padrões H_ASPIRADO_OMITIDO/VOGAL_ENGOLIDA/R_L_T_CONFUSAO/OUTRO — TDD literal.
 - `web`: Vite+React+TS, `MediaRecorder` nativo, roteamento protegido, cliente HTTP fino com JWT em
-  `localStorage`. **Não testado interativamente em browser real nesta sessão** (sem ferramenta de
-  browser disponível) — ver débito técnico abaixo.
+  `localStorage`. **Testado interativamente em browser real (Chromium via Playwright), mais tarde
+  na mesma sessão** — ver "Última ação" no topo do arquivo. CORS e centralização de layout eram os dois
+  bugs reais que essa verificação revelou; ambos corrigidos.
 
 ## Débito técnico conhecido (ordenado por prioridade)
-1. **Fase 5 (web) não foi testada interativamente num browser real.** `tsc -b && vite build` e `oxlint`
-   passam limpo, dev server serve os módulos, mas cliques reais, `MediaRecorder` com microfone de
-   verdade, e as telas renderizando dados reais do `core-api` não foram verificados por mim (sem
-   ferramenta de browser nesta sessão). Rodar manualmente `cd web && npm run dev`, abrir
-   `http://localhost:5173`, com `docker compose up` no ar, e percorrer registro → lista → gravação →
-   resultado → dashboard antes de confiar na tela de exercício em uso real.
-2. **Efeitos colaterais de `attempts.Submit` (SM-2/gamificação/phonetics) não são transacionais** — ver
-   decisão técnica acima. Se isso incomodar, próximo passo é envolver os 4 passos numa transação
+1. **Efeitos colaterais de `attempts.Submit` (SM-2/gamificação/phonetics) não são transacionais** — ver
+   decisão técnica da Fase 6. Se isso incomodar, próximo passo é envolver os 4 passos numa transação
    Postgres ou introduzir padrão outbox.
-3. **Refresh token não é revogável nem rotacionado** — sem blacklist/allowlist em Redis (que ainda não
+2. **Refresh token não é revogável nem rotacionado** — sem blacklist/allowlist em Redis (que ainda não
    entrou no projeto — nada até agora precisou dele de verdade).
-4. **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento** — trocar antes de qualquer
+3. **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento** — trocar antes de qualquer
    deploy real.
-5. **Sem rate limiting em `/auth/login`, `/auth/register`** — vulnerável a brute-force/enumeração.
-6. **`GET /exercises/{id}/attempts` sem paginação** — ok pro volume atual (dezenas por usuário/exercício
+4. **Sem rate limiting em `/auth/login`, `/auth/register`** — vulnerável a brute-force/enumeração.
+5. **`GET /exercises/{id}/attempts` sem paginação** — ok pro volume atual (dezenas por usuário/exercício
    em 60 dias), vira problema se isso crescer muito.
-7. **`react-router-dom@7.18.2` tem 1 advisory de severidade alta em aberto** (RSC Mode CSRF,
+6. **`react-router-dom@7.18.2` tem 1 advisory de severidade alta em aberto** (RSC Mode CSRF,
    GHSA-qwww-vcr4-c8h2) — não aplicável: SPA cliente puro, sem RSC/Server Actions. Reavaliar se o
    projeto adotar SSR algum dia.
+7. **`GET /dashboard/heatmap` ainda não foi exercitado pela UI do `web`** — o dashboard atual só usa
+   `GET /exercises` + `GET /exercises/{id}/attempts` (N+1) pra montar a tabela de progresso; o endpoint
+   agregado (`GET /users/me/progress`, `GET /dashboard/heatmap`) existe no backend desde a Fase 6 mas o
+   frontend não foi atualizado pra consumi-lo. Trocar o N+1 do dashboard por esses endpoints é uma
+   melhoria de performance pendente, não um bug.
 8. Nenhum HF_TOKEN configurado no stt-service — download do modelo usa rate limit anônimo do HF Hub.
 9. `stt-service` não tem teste de integração automatizado com o modelo real, só smoke test manual via
    curl.
@@ -106,13 +155,13 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
     do CLAUDE.md), não esquecimento.
 
 ## Próximo passo imediato
-Todas as 6 fases do MVP end-to-end estão implementadas e verificadas via curl/testes automatizados
-(exceto a verificação manual de browser da Fase 5, item 1 do débito técnico acima — maior prioridade).
-Se reabrir uma sessão sem instrução nova do usuário: (a) rodar a suite completa (`go test ./...` em
-`core-api`, `npm run build` em `web`) pra confirmar que nada quebrou; (b) se houver acesso a browser,
-fechar o item 1 do débito técnico; (c) senão, atacar o item 2 (transação nos efeitos colaterais de
-`attempts.Submit`) ou o item 3 (Redis + revogação de refresh token), que são os próximos de maior
-impacto técnico real.
+Todas as 6 fases do MVP end-to-end estão implementadas e verificadas — incluindo o `web` num browser
+real, não só build/tsc. Não há mais nenhuma fase pendente do CLAUDE.md original. Se reabrir uma sessão
+sem instrução nova do usuário: (a) rodar a suite completa (`go test ./...` em `core-api`, `npm run
+build` em `web`) pra confirmar que nada quebrou; (b) atacar o item 1 do débito técnico (transação nos
+efeitos colaterais de `attempts.Submit`) ou o item 2 (Redis + revogação de refresh token), que são os
+próximos de maior impacto técnico real; (c) considerar trocar o N+1 do dashboard (item 7) pelos
+endpoints agregados que já existem no backend.
 
 ---
 
