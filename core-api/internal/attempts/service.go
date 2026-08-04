@@ -40,7 +40,7 @@ type UserStatsRepository interface {
 }
 
 type PhoneticsRepository interface {
-	IncrementPatterns(ctx context.Context, userID uuid.UUID, counts map[comparison.ErrorPattern]int) error
+	IncrementPatterns(ctx context.Context, userID uuid.UUID, language string, counts map[comparison.ErrorPattern]int) error
 }
 
 type Service struct {
@@ -103,6 +103,7 @@ func (s *Service) Submit(ctx context.Context, userID, exerciseID uuid.UUID, file
 		SimilarityScore: result.SimilarityScore,
 		Verdict:         result.Verdict,
 		PhoneticDiff:    result.PhoneticDiff,
+		Language:        exercise.Language,
 	}
 	if err := s.repo.Create(ctx, attempt); err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func (s *Service) Submit(ctx context.Context, userID, exerciseID uuid.UUID, file
 	}
 
 	if counts := phonetics.CountPatterns(result.PhoneticDiff); len(counts) > 0 {
-		if err := s.phoneticsRepo.IncrementPatterns(ctx, userID, counts); err != nil {
+		if err := s.phoneticsRepo.IncrementPatterns(ctx, userID, exercise.Language, counts); err != nil {
 			return nil, err
 		}
 	}

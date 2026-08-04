@@ -37,6 +37,10 @@ func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercis
 		args = append(args, *filter.Difficulty)
 		conditions = append(conditions, fmt.Sprintf("difficulty = $%d", len(args)))
 	}
+	if filter.Language != nil {
+		args = append(args, *filter.Language)
+		conditions = append(conditions, fmt.Sprintf("language = $%d", len(args)))
+	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}

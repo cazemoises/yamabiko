@@ -16,5 +16,6 @@ type Attempt struct {
 	SimilarityScore float64                `json:"similarity_score"`
 	Verdict         comparison.Verdict     `json:"verdict"`
 	PhoneticDiff    []comparison.DiffEntry `json:"phonetic_diff"`
+	Language        string                 `json:"language"`
 	CreatedAt       time.Time              `json:"created_at"`
 }

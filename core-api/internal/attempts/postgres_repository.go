@@ -25,17 +25,17 @@ func (r *PostgresRepository) Create(ctx context.Context, attempt *Attempt) error
 	}
 
 	_, err = r.pool.Exec(ctx,
-		`INSERT INTO attempts (id, user_id, exercise_id, audio_transcript, similarity_score, verdict, phonetic_diff)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		`INSERT INTO attempts (id, user_id, exercise_id, audio_transcript, similarity_score, verdict, phonetic_diff, language)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		attempt.ID, attempt.UserID, attempt.ExerciseID, attempt.AudioTranscript,
-		attempt.SimilarityScore, string(attempt.Verdict), json.RawMessage(diffJSON),
+		attempt.SimilarityScore, string(attempt.Verdict), json.RawMessage(diffJSON), attempt.Language,
 	)
 	return err
 }
 
 func (r *PostgresRepository) ListByUserAndExercise(ctx context.Context, userID, exerciseID uuid.UUID) ([]Attempt, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, user_id, exercise_id, audio_transcript, similarity_score, verdict, phonetic_diff, created_at
+		`SELECT id, user_id, exercise_id, audio_transcript, similarity_score, verdict, phonetic_diff, language, created_at
 		 FROM attempts WHERE user_id = $1 AND exercise_id = $2 ORDER BY created_at DESC`,
 		userID, exerciseID,
 	)
@@ -49,7 +49,7 @@ func (r *PostgresRepository) ListByUserAndExercise(ctx context.Context, userID, 
 		var a Attempt
 		var diffJSON []byte
 		var verdict string
-		if err := rows.Scan(&a.ID, &a.UserID, &a.ExerciseID, &a.AudioTranscript, &a.SimilarityScore, &verdict, &diffJSON, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.UserID, &a.ExerciseID, &a.AudioTranscript, &a.SimilarityScore, &verdict, &diffJSON, &a.Language, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		a.Verdict = comparison.Verdict(verdict)

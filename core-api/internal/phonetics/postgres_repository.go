@@ -17,14 +17,14 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{pool: pool}
 }
 
-func (r *PostgresRepository) IncrementPatterns(ctx context.Context, userID uuid.UUID, counts map[comparison.ErrorPattern]int) error {
+func (r *PostgresRepository) IncrementPatterns(ctx context.Context, userID uuid.UUID, language string, counts map[comparison.ErrorPattern]int) error {
 	for pattern, count := range counts {
 		_, err := r.pool.Exec(ctx,
-			`INSERT INTO phonetic_error_patterns (user_id, pattern_type, occurrences, last_seen_at)
-			 VALUES ($1, $2, $3, now())
-			 ON CONFLICT (user_id, pattern_type)
-			 DO UPDATE SET occurrences = phonetic_error_patterns.occurrences + $3, last_seen_at = now()`,
-			userID, string(pattern), count,
+			`INSERT INTO phonetic_error_patterns (user_id, pattern_type, language, occurrences, last_seen_at)
+			 VALUES ($1, $2, $3, $4, now())
+			 ON CONFLICT (user_id, pattern_type, language)
+			 DO UPDATE SET occurrences = phonetic_error_patterns.occurrences + $4, last_seen_at = now()`,
+			userID, string(pattern), language, count,
 		)
 		if err != nil {
 			return err

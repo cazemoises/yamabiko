@@ -13,6 +13,7 @@ type Filter struct {
 	SprintDay  *int
 	Category   *string
 	Difficulty *int
+	Language   *string
 }
 
 type Repository interface {

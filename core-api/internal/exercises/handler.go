@@ -41,6 +41,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		filter.Difficulty = &difficulty
 	}
+	if v := q.Get("language"); v != "" {
+		filter.Language = &v
+	}
 
 	list, err := h.repo.List(r.Context(), filter)
 	if err != nil {

@@ -17,7 +17,7 @@ type PatternCount struct {
 }
 
 type Repository interface {
-	IncrementPatterns(ctx context.Context, userID uuid.UUID, counts map[comparison.ErrorPattern]int) error
+	IncrementPatterns(ctx context.Context, userID uuid.UUID, language string, counts map[comparison.ErrorPattern]int) error
 	Heatmap(ctx context.Context, userID uuid.UUID) ([]PatternCount, error)
 }
 

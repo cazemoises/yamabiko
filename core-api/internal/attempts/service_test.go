@@ -127,7 +127,7 @@ func newFakePhoneticsRepo() *fakePhoneticsRepo {
 	return &fakePhoneticsRepo{incremented: map[comparison.ErrorPattern]int{}}
 }
 
-func (f *fakePhoneticsRepo) IncrementPatterns(_ context.Context, _ uuid.UUID, counts map[comparison.ErrorPattern]int) error {
+func (f *fakePhoneticsRepo) IncrementPatterns(_ context.Context, _ uuid.UUID, _ string, counts map[comparison.ErrorPattern]int) error {
 	for pattern, count := range counts {
 		f.incremented[pattern] += count
 	}
