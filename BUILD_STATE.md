@@ -4,6 +4,53 @@
 Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US).
 
 ## Última ação
+**Piper TTS pra en-US + generalização do módulo `tts/` (TTSClient)** — pedido de follow-up do usuário,
+enviado no meio da sessão da troca de speaker do VOICEVOX (ver histórico abaixo) e tratado como um pedido
+à parte, maior. Executado em 4 commits atômicos (docker-compose → interface TTSClient + PiperClient →
+endpoint generalizado → frontend).
+
+- **Descoberta antes de implementar: Piper não tem API HTTP.** A sugestão do usuário
+  (`rhasspy/wyoming-piper`) e a imagem escolhida (`lscr.io/linuxserver/piper`, que empacota o mesmo
+  `wyoming-piper` por baixo) **só falam o protocolo Wyoming — TCP puro, sem HTTP nenhum**. Confirmado
+  empiricamente (não presumido): subi a imagem isolada, tentei `curl` contra ela (conexão vazia, sem
+  resposta HTTP) e escrevi um probe TCP manual em Python que abriu conexão direta na porta 10200 e
+  reproduziu o handshake — só assim descobri o formato de fio real: uma linha JSON de cabeçalho
+  (`type`/`data_length`/`payload_length`) seguida de exatos `data_length` bytes de um 2º blob JSON (sem
+  newline) seguida de exatos `payload_length` bytes de payload binário quando presente. A sequência de
+  síntese é `audio-start` -> N×`audio-chunk` -> `audio-stop`, e o áudio chega como **PCM cru, sem
+  cabeçalho WAV** — diferente do que eu teria adivinhado por conhecimento genérico do protocolo Wyoming
+  (que eu sabia existir, mas não a forma exata de framing sem verificar). Essa investigação virou a base
+  de `core-api/internal/tts/piper_client.go`.
+- **`docker-compose.yml`**: serviço `piper` (`lscr.io/linuxserver/piper:latest`), `PIPER_VOICE=
+  en_US-lessac-medium` (voz adulta neutra de qualidade média-alta — mesmo raciocínio da escolha de
+  speaker do VOICEVOX, evitar voz de mascote), volume `piper-voices` dedicado (o modelo é baixado no 1º
+  start), sem `ports:` (só rede interna, mesmo padrão do voicevox).
+- **`core-api/internal/tts/` generalizado**: nova interface `TTSClient` (`tts.go`) — `VoicevoxClient`
+  (renomeado de `client.go` pra `voicevox_client.go`) e o novo `PiperClient` (`piper_client.go`, fala
+  Wyoming via `net.Dial` + parsing manual do framing, remonta um WAV de verdade a partir do PCM cru
+  usando o formato anunciado em `audio-start`) implementam a mesma interface. `tts.Service` trocou o
+  campo `synthesizer` único por `clients map[string]TTSClient`, roteado pelo subtag primário do idioma do
+  exercício (`"ja"` -> VoicevoxClient, `"en"` -> PiperClient) — **removeu o gate hardcoded em ja-JP e o
+  404 forçado pra en-US** que existia desde a sessão anterior. `ErrLanguageNotSupported` agora só dispara
+  pra um idioma sem client registrado no mapa (nenhum dos dois atuais). Cache em disco intacto — a chave
+  continua sendo só `exercise_id`, funciona pros dois idiomas sem mudança nenhuma no cache (cada
+  exercício só tem 1 idioma, nunca colide).
+- **Frontend**: `SpeakButton` perdeu de vez a Web Speech API (não sobrou nenhum branch condicional por
+  idioma) — busca `GET /exercises/{id}/reference-audio` e toca via `<audio>`, ponto, pros dois idiomas.
+  Props `text`/`lang` saíram do componente por não terem mais uso nenhum.
+- **e2e**: `reference-audio.spec.ts` virou 2 testes simétricos (ja-JP e en-US) rodando o mesmo helper —
+  o fluxo en-US agora é **testável em headless** igual o ja-JP já era (mesma razão: é HTTP + `<audio>`
+  real, não mais Web Speech API).
+- **Verificação end-to-end real contra a stack via `docker compose up`**: exercício en-US, 1ª chamada ao
+  endpoint ~1.08s (cache miss, chamou o Piper de verdade via Wyoming), 2ª chamada ~0.064s (cache hit,
+  bytes idênticos); WAV resultante com header RIFF/WAVE válido e `data` size batendo exatamente com o PCM
+  recebido do Piper. Exercício ja-JP re-testado depois do refactor pra confirmar que o VOICEVOX não
+  quebrou (continua 200, mesmo comportamento).
+- `go build`/`go vet`/`go test ./...` (core-api, pacote `tts` com 18 testes incluindo os novos de
+  `PiperClient` e de roteamento por idioma) e `tsc -b && vite build`/`oxlint`/`playwright test` (web, 8/8
+  specs e2e) todos passando.
+
+## Última ação (troca de speaker do VOICEVOX — histórico)
 **Troca do speaker padrão do VOICEVOX (mascote -> voz neutra/adulta)** — pedido de follow-up do usuário
 sobre a integração VOICEVOX da sessão anterior.
 
