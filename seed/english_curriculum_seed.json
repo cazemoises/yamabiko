@@ -1,0 +1,64 @@
+{
+  "language": "en-US",
+  "target_speaker_l1": "pt-BR",
+  "phonetic_taxonomy_new_categories": [
+    {
+      "pattern_type": "TH_SUBSTITUICAO",
+      "description": "Sons TH (θ/ð) não existem em português; PT-BR troca por T/D/S/F/Z. Ex: 'think' -> 'tink'/'sink', 'this' -> 'dis'/'zis'."
+    },
+    {
+      "pattern_type": "VOGAL_FINAL_ADICIONADA",
+      "description": "PT-BR tende a abrir sílaba fechada acrescentando vogal após consoante final. Ex: 'hot' -> 'hoti', 'good' -> 'gudi'."
+    },
+    {
+      "pattern_type": "VOGAL_REDUZIDA_IGNORADA",
+      "description": "Sílabas átonas em inglês reduzem pra schwa (/ə/); PT-BR pronuncia a vogal plena. Ex: 'about' pronunciado com O completo em vez de schwa."
+    },
+    {
+      "pattern_type": "R_AMERICANO_TROCADO",
+      "description": "R retroflexo do inglês americano substituído pelo R gutural/tepe do português. Ex: 'car', 'work'."
+    },
+    {
+      "pattern_type": "CONSOANTE_FINAL_OMITIDA",
+      "description": "PT-BR tende a suavizar ou omitir consoantes finais oclusivas. Ex: 'stop' sem o P final audível."
+    }
+  ],
+  "note_for_engineering": "Diferente da taxonomia de japonês, alguns desses erros (especialmente STRESS/vogal reduzida) são de prosódia, não de fonema isolado — a engine de comparação atual (Levenshtein sobre transcript) pode não capturar bem esses casos, já que o Whisper às vezes 'corrige' mentalmente o áudio mesmo com stress errado. Tratar como limitação conhecida, documentar em BUILD_STATE.md, não bloquear o seed por causa disso.",
+  "exercises": [
+    {"category": "saudacoes", "difficulty": 1, "prompt_pt": "Cumprimente alguém casualmente dizendo 'oi, como você está?'", "expected_transcript": "hi, how are you?"},
+    {"category": "saudacoes", "difficulty": 1, "prompt_pt": "Responda que está bem, obrigado, e pergunte de volta.", "expected_transcript": "I'm good, thanks. And you?"},
+    {"category": "saudacoes", "difficulty": 1, "prompt_pt": "Apresente-se dizendo seu nome.", "expected_transcript": "my name is Moisés"},
+    {"category": "saudacoes", "difficulty": 2, "prompt_pt": "Diga que é um prazer te conhecer.", "expected_transcript": "nice to meet you"},
+    {"category": "saudacoes", "difficulty": 2, "prompt_pt": "Se despeça dizendo que precisa ir e foi bom te ver.", "expected_transcript": "I have to go, it was good seeing you"},
+
+    {"category": "compras", "difficulty": 1, "prompt_pt": "Pergunte quanto custa um item.", "expected_transcript": "how much does this cost?"},
+    {"category": "compras", "difficulty": 2, "prompt_pt": "Diga que só está olhando, quando o vendedor perguntar se precisa de ajuda.", "expected_transcript": "I'm just looking, thanks"},
+    {"category": "compras", "difficulty": 2, "prompt_pt": "Pergunte se eles aceitam cartão de crédito.", "expected_transcript": "do you accept credit cards?"},
+    {"category": "compras", "difficulty": 3, "prompt_pt": "Diga que quer trocar um item porque veio com defeito.", "expected_transcript": "I'd like to exchange this, it's defective"},
+    {"category": "compras", "difficulty": 2, "prompt_pt": "Pergunte onde fica o provador.", "expected_transcript": "where is the fitting room?"},
+
+    {"category": "restaurante", "difficulty": 1, "prompt_pt": "Peça uma mesa para duas pessoas.", "expected_transcript": "a table for two, please"},
+    {"category": "restaurante", "difficulty": 2, "prompt_pt": "Pergunte o que o garçom recomenda.", "expected_transcript": "what do you recommend?"},
+    {"category": "restaurante", "difficulty": 2, "prompt_pt": "Peça a conta.", "expected_transcript": "can I have the check, please?"},
+    {"category": "restaurante", "difficulty": 3, "prompt_pt": "Diga que é alérgico a amendoim.", "expected_transcript": "I'm allergic to peanuts"},
+    {"category": "restaurante", "difficulty": 2, "prompt_pt": "Peça um copo d'água sem gás.", "expected_transcript": "a glass of still water, please"},
+
+    {"category": "direcoes", "difficulty": 2, "prompt_pt": "Pergunte como chegar na estação de metrô mais próxima.", "expected_transcript": "how do I get to the nearest subway station?"},
+    {"category": "direcoes", "difficulty": 1, "prompt_pt": "Pergunte se fica perto daqui.", "expected_transcript": "is it close to here?"},
+    {"category": "direcoes", "difficulty": 3, "prompt_pt": "Diga que está perdido e precisa de ajuda.", "expected_transcript": "I'm lost, can you help me?"},
+    {"category": "direcoes", "difficulty": 2, "prompt_pt": "Pergunte se pode chamar um táxi.", "expected_transcript": "can you call me a taxi?"},
+    {"category": "direcoes", "difficulty": 2, "prompt_pt": "Pergunte quanto tempo demora a pé.", "expected_transcript": "how long does it take on foot?"},
+
+    {"category": "emergencia_saude", "difficulty": 3, "prompt_pt": "Diga que precisa de um médico.", "expected_transcript": "I need a doctor"},
+    {"category": "emergencia_saude", "difficulty": 2, "prompt_pt": "Diga que não está se sentindo bem.", "expected_transcript": "I'm not feeling well"},
+    {"category": "emergencia_saude", "difficulty": 3, "prompt_pt": "Explique que perdeu seu passaporte.", "expected_transcript": "I lost my passport"},
+    {"category": "emergencia_saude", "difficulty": 3, "prompt_pt": "Peça pra chamar a polícia.", "expected_transcript": "please call the police"},
+    {"category": "emergencia_saude", "difficulty": 2, "prompt_pt": "Pergunte onde fica o hospital mais próximo.", "expected_transcript": "where is the nearest hospital?"},
+
+    {"category": "trabalho_social", "difficulty": 3, "prompt_pt": "Se apresente profissionalmente dizendo o que você faz.", "expected_transcript": "I work as a software developer"},
+    {"category": "trabalho_social", "difficulty": 2, "prompt_pt": "Diga que sente muito por chegar atrasado.", "expected_transcript": "sorry I'm late"},
+    {"category": "trabalho_social", "difficulty": 3, "prompt_pt": "Pergunte se pode remarcar a reunião.", "expected_transcript": "can we reschedule the meeting?"},
+    {"category": "trabalho_social", "difficulty": 2, "prompt_pt": "Diga que não entendeu e peça pra repetir.", "expected_transcript": "sorry, could you repeat that?"},
+    {"category": "trabalho_social", "difficulty": 4, "prompt_pt": "Diga que vai pensar sobre a proposta e retornar em breve.", "expected_transcript": "I'll think about the offer and get back to you soon"}
+  ]
+}
