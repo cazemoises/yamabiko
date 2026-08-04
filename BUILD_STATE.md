@@ -3,6 +3,36 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Bug real corrigido: classificador de `phonetic_diff` devolvendo `OUTRO` pra quase toda divergência**
+(item 1/3 do pedido do usuário nesta sessão, prioridade máxima por ser bug de lógica de negócio — TDD
+literal, RED confirmado antes da correção).
+
+- Causa raiz em `core-api/internal/comparison/compare.go`: `classifySubstitute()` só reconhecia
+  substituições dentro do conjunto ら/た-row (`R_L_T_CONFUSAO`) — qualquer outro par de caracteres
+  substituídos caía em `OUTRO` incondicionalmente, mesmo pares claramente ligados a um padrão já
+  definido (ex: confusão entre duas vogais puras). `H_ASPIRADO_OMITIDO` e `VOGAL_ENGOLIDA` só eram
+  aplicados a operações `DELETE` (via `classifyDelete`), nunca a `SUBSTITUTE` — mas na prática o Whisper
+  produz muito mais substituições do que omissões puras, daí a taxa de `OUTRO` perto de 100% em produção.
+- Testes adicionados com os 3 pares observados em produção (`compare_test.go`):
+  - esperado「え」/transcrito「い」 (par de vogais puras, ambos em `pureVowels`) — **RED**: vinha `OUTRO`,
+    devia bater em `VOGAL_ENGOLIDA`.
+  - esperado「わ」/transcrito「お」 e esperado「す」/transcrito「ず」 — confirmados como não-encaixe
+    genuíno em nenhum dos 3 padrões definidos (わ não é vogal pura nem ら/た-row; す/ず diferem só por
+    dakuten/sonorização, sem padrão próprio na Sec. 3 do CLAUDE.md) — **permanecem `OUTRO`
+    deliberadamente**, testado explicitamente pra não regredir esse caso junto com o fix.
+  - Teste composto (`TestCompare_MixedProductionSubstitutions_NotAllOutro`) roda os 3 pares numa única
+    comparação e falha explicitamente se **todas** as entradas vierem `OUTRO` — é a asserção que prova o
+    bug relatado ("praticamente 100% OUTRO") deixou de acontecer.
+- Fix: `classifySubstitute` ganhou um segundo case — `pureVowels[expected] && pureVowels[actual]` →
+  `VOGAL_ENGOLIDA` (confusão de qualidade vocálica via substituição é o mesmo problema fonético da
+  omissão, só que o Whisper ouviu uma vogal errada em vez de nenhuma). `H_ASPIRADO_OMITIDO` não foi
+  estendido pra `SUBSTITUTE` — nenhum dos pares observados em produção envolvia は-row, e o nome do
+  padrão ("omitido") já é literal sobre ser só `DELETE`; não expandir escopo além do bug relatado.
+- `go test ./...` (todos os pacotes) e `go vet ./...` limpos após o fix — nenhuma regressão nos testes
+  pré-existentes de `comparison` (H_ASPIRADO_OMITIDO/VOGAL_ENGOLIDA via DELETE, R_L_T_CONFUSAO,
+  OUTRO em substituição/inserção não reconhecida).
+
+## Última ação (pós-Fase 6, refresh de token — histórico)
 **Interceptor de refresh automático de access token no `web`** (pedido explícito do usuário — item de
 débito técnico não listado antes, mas real: antes desta sessão o frontend não tratava expiração de JWT,
 exigindo relogin manual mesmo com `/auth/refresh` já implementado no `core-api` desde a Fase 2).
@@ -196,13 +226,13 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
 ## Próximo passo imediato
 Pedido explícito do usuário nesta sessão, três itens em ordem de prioridade (item 1 é bug de lógica de
 negócio, tratado com TDD; itens 2 e 3 são UX):
-1. **[EM ANDAMENTO] Bug no classificador de `phonetic_diff`** — `comparison/` está devolvendo `OUTRO`
-   pra quase toda divergência, incluindo pares que deveriam bater em padrões conhecidos
-   (`H_ASPIRADO_OMITIDO`, `VOGAL_ENGOLIDA`, `R_L_T_CONFUSAO`). Casos de produção observados a cobrir com
-   teste: esperado「わ」/transcrito「お」, esperado「え」/transcrito「い」, esperado「す」/transcrito「ず」.
-2. UX do resultado do desafio: highlight visual dos caracteres divergentes lado a lado (esperado vs.
-   transcrito), romaji junto de cada trecho divergente, labels técnicos (SUBSTITUTE/INSERT/OUTRO)
-   trocados por explicação em português pro aluno. Teste e2e Playwright cobrindo a nova exibição.
+1. **[CONCLUÍDO]** Bug no classificador de `phonetic_diff` — corrigido (`classifySubstitute` agora
+   reconhece confusão entre vogais puras como `VOGAL_ENGOLIDA`, não só pares ら/た-row). Ver "Última
+   ação" acima.
+2. **[PRÓXIMO]** UX do resultado do desafio: highlight visual dos caracteres divergentes lado a lado
+   (esperado vs. transcrito), romaji junto de cada trecho divergente, labels técnicos
+   (SUBSTITUTE/INSERT/OUTRO) trocados por explicação em português pro aluno. Teste e2e Playwright
+   cobrindo a nova exibição.
 3. Indicador de volume em tempo real durante a gravação (`AnalyserNode` da Web Audio API sobre o stream
    do `MediaRecorder` já existente em `components/audio/`).
 

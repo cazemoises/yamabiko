@@ -124,6 +124,69 @@ func TestCompare_UnrecognizedSubstitution_MarksOutro(t *testing.T) {
 	}
 }
 
+func TestCompare_DetectsVogalEngolida_ViaSubstituicao(t *testing.T) {
+	// Achado real de produção: esperado「え」, transcrito「い」 — confusão entre
+	// vogais puras não deveria cair em OUTRO só porque é SUBSTITUTE, não DELETE.
+	result := comparison.Compare("え", "い")
+
+	if len(result.PhoneticDiff) != 1 {
+		t.Fatalf("esperava 1 entrada no diff, veio %d", len(result.PhoneticDiff))
+	}
+	entry := result.PhoneticDiff[0]
+	if entry.Op != comparison.OpSubstitute {
+		t.Fatalf("esperava SUBSTITUTE, veio %v", entry.Op)
+	}
+	if entry.Pattern != comparison.PatternVogalEngolida {
+		t.Fatalf("esperava VOGAL_ENGOLIDA, veio %v", entry.Pattern)
+	}
+}
+
+func TestCompare_MixedProductionSubstitutions_NotAllOutro(t *testing.T) {
+	// Os 3 pares observados em produção (Sec. de bug report): わ->お, え->い, す->ず.
+	// Antes da correção, classifySubstitute só reconhecia pares ら/た-row
+	// (R_L_T_CONFUSAO), então TODOS os 3 caíam em OUTRO — o bug reportado. Depois
+	// da correção, え->い (par de vogais puras) deve bater em VOGAL_ENGOLIDA; わ->お
+	// e す->ず genuinamente não se encaixam em nenhum padrão conhecido (nem
+	// h-aspirado, nem par de vogais puras, nem ら/た-row) e permanecem OUTRO —
+	// o que é aceitável, desde que não seja 100% dos casos.
+	result := comparison.Compare("わえす", "おいず")
+
+	if len(result.PhoneticDiff) != 3 {
+		t.Fatalf("esperava 3 entradas no diff, veio %d", len(result.PhoneticDiff))
+	}
+
+	outroCount := 0
+	for _, entry := range result.PhoneticDiff {
+		if entry.Pattern == comparison.PatternOutro {
+			outroCount++
+		}
+	}
+	if outroCount == len(result.PhoneticDiff) {
+		t.Fatalf("todas as %d divergências vieram como OUTRO — bug do classificador não corrigido", len(result.PhoneticDiff))
+	}
+
+	vogalEntry := result.PhoneticDiff[1]
+	if vogalEntry.Expected != "え" || vogalEntry.Actual != "い" {
+		t.Fatalf("esperava a 2ª entrada ser え->い, veio %q->%q", vogalEntry.Expected, vogalEntry.Actual)
+	}
+	if vogalEntry.Pattern != comparison.PatternVogalEngolida {
+		t.Fatalf("esperava VOGAL_ENGOLIDA pra え->い, veio %v", vogalEntry.Pattern)
+	}
+}
+
+func TestCompare_VoicingConfusion_SuZu_RemainsOutro(t *testing.T) {
+	// す->ず: diferem só pelo dakuten (sonorização), não coberto por nenhum dos 3
+	// padrões definidos na Sec. 3 do CLAUDE.md — permanece OUTRO legitimamente.
+	result := comparison.Compare("す", "ず")
+
+	if len(result.PhoneticDiff) != 1 {
+		t.Fatalf("esperava 1 entrada no diff, veio %d", len(result.PhoneticDiff))
+	}
+	if result.PhoneticDiff[0].Pattern != comparison.PatternOutro {
+		t.Fatalf("esperava OUTRO pra す->ず, veio %v", result.PhoneticDiff[0].Pattern)
+	}
+}
+
 func TestCompare_ExtraInsertedMora_MarksOutro(t *testing.T) {
 	// "ねこ" -> "ねこあ": mora extra inserida (alucinação do Whisper), sem padrão fonético definido.
 	result := comparison.Compare("ねこ", "ねこあ")

@@ -133,10 +133,17 @@ func classifyDelete(expected rune) ErrorPattern {
 }
 
 func classifySubstitute(expected, actual rune) ErrorPattern {
-	if rltConfusable[expected] && rltConfusable[actual] {
+	switch {
+	case rltConfusable[expected] && rltConfusable[actual]:
 		return PatternRLTConfusao
+	case pureVowels[expected] && pureVowels[actual]:
+		// Confusão entre duas vogais puras (ex: え/い) é o mesmo problema de
+		// qualidade vocálica da VOGAL_ENGOLIDA, só que via substituição em vez
+		// de omissão completa da mora.
+		return PatternVogalEngolida
+	default:
+		return PatternOutro
 	}
-	return PatternOutro
 }
 
 // normalize remove todo espaço em branco, aplica NFKC (unifica formas de
