@@ -1,7 +1,3 @@
-// Package tts fala com o VOICEVOX (motor de TTS japonês open-source, Sec.
-// pedida pelo usuário) — igual sttclient, é o único ponto do core-api que
-// conhece o protocolo HTTP do VOICEVOX; o resto do core-api só vê a
-// interface Synthesizer (texto -> WAV).
 package tts
 
 import (

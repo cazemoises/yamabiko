@@ -16,11 +16,12 @@ import (
 // VOICEVOX só sintetiza japonês, então pra outros idiomas (ex: en-US) o
 // frontend deve usar a Web Speech API do próprio browser em vez deste
 // endpoint (Sec. pedida pelo usuário).
+//
+// TODO(generalização en-US/Piper): este gate fica hardcoded em ja-JP só
+// nesta etapa (introdução da interface TTSClient) — o próximo commit troca
+// pra seleção por idioma via mapa de TTSClient, momento em que este comentário
+// e o texto do erro deixam de fazer sentido só sobre o VOICEVOX.
 var ErrLanguageNotSupported = errors.New("tts: idioma do exercício não é suportado pelo VOICEVOX")
-
-type Synthesizer interface {
-	Synthesize(ctx context.Context, text string) ([]byte, error)
-}
 
 type ExerciseFinder interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*exercises.Exercise, error)
@@ -32,12 +33,12 @@ type ExerciseFinder interface {
 // mesmo exercício (mesmo raciocínio de custo/latência do débito documentado
 // em BUILD_STATE.md sobre a Web Speech API, mas resolvido de fato aqui).
 type Service struct {
-	synthesizer    Synthesizer
+	synthesizer    TTSClient
 	exerciseFinder ExerciseFinder
 	cacheDir       string
 }
 
-func NewService(synthesizer Synthesizer, exerciseFinder ExerciseFinder, cacheDir string) *Service {
+func NewService(synthesizer TTSClient, exerciseFinder ExerciseFinder, cacheDir string) *Service {
 	return &Service{synthesizer: synthesizer, exerciseFinder: exerciseFinder, cacheDir: cacheDir}
 }
 
