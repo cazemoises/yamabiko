@@ -4,6 +4,25 @@
 Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios).
 
 ## Última ação
+**Importação de `japanese_scenarios_pilot.json` (3 cenários ja-JP)** — pedido de follow-up do usuário, na
+sequência do modelo de scenarios (ver histórico abaixo).
+
+- **Migration `0014`**: 3 cenários (`Cumprimentar um colega no trabalho de manhã`, `Check-in no
+  aeroporto`, `Jantar em família`), 4 exercícios encadeados cada, `sprint_day_ref` 51-53 (1 por cenário,
+  trilha própria — não colide com os dias 1-50 do currículo ja-JP principal nem 1-30 do en-US).
+- **Dedupe verificado por `expected_transcript` exato contra os seeds anteriores** (migrations 0004 e
+  0010, os únicos que já tinham `language='ja-JP'`): dos 12 exercícios do pilot, só 1 colisão real —
+  `おはようございます` (cenário 1, exercício 1) já existia solto desde a migration 0010
+  (`saudacoes_apresentacao`, `sprint_day_ref=1`). Em vez de duplicar, a migration faz `UPDATE` nesse
+  exercício (seta `scenario_id`/`order_in_scenario=1`), preservando seu `id`/`category`/`sprint_day_ref`
+  originais — confirmado ao vivo via `psql` que continua sendo a mesma linha (mesmo `id`), não uma cópia.
+  Os outros 11 exercícios são `INSERT` novo.
+- **Verificado contra Postgres real e via API** (`docker compose up -d --build core-api`):
+  `schema_migrations.version=14`, `dirty=false`; `12` exercícios com `scenario_id` não-nulo (3×4);
+  `GET /scenarios/{id}` do cenário 1 devolve os 4 exercícios ordenados (`order_in_scenario` 1-4) e o 1º
+  bate exatamente com o `id` pré-existente da migration 0010.
+
+## Última ação (modelo de scenarios + fluxo + retry — histórico)
 **Modelo de scenarios + redesenho do fluxo de exercício + retry de 1 clique** — pedido explícito do
 usuário ("duas mudanças no core loop, sem nenhuma gamificação nova"). Executado em 4 commits atômicos
 (schema → backend → frontend/fluxo de cenário → frontend/retry), cada um com sua verificação própria.

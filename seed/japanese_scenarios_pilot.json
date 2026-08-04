@@ -1,0 +1,38 @@
+{
+  "language": "ja-JP",
+  "scenarios": [
+    {
+      "title_pt": "Cumprimentar um colega no trabalho de manhã",
+      "context_description_pt": "Você chega no escritório e cruza com um colega. É de manhã, ambiente informal mas profissional.",
+      "order_index": 1,
+      "exercises": [
+        {"order_in_scenario": 1, "prompt_pt": "Cumprimente dizendo bom dia.", "expected_transcript": "おはようございます", "expected_romaji": "ohayou gozaimasu"},
+        {"order_in_scenario": 2, "prompt_pt": "O colega pergunta como você está. Responda que está bem.", "expected_transcript": "げんきです、ありがとうございます", "expected_romaji": "genki desu, arigatou gozaimasu"},
+        {"order_in_scenario": 3, "prompt_pt": "Pergunte de volta como ele está.", "expected_transcript": "おげんきですか", "expected_romaji": "o genki desu ka"},
+        {"order_in_scenario": 4, "prompt_pt": "Se despeça dizendo que vai trabalhar bem / se esforçar (expressão comum ao começar o dia de trabalho).", "expected_transcript": "きょうもがんばりましょう", "expected_romaji": "kyou mo ganbarimashou"}
+      ]
+    },
+    {
+      "title_pt": "Check-in no aeroporto",
+      "context_description_pt": "Você está no balcão de check-in de uma companhia aérea no Japão.",
+      "order_index": 2,
+      "exercises": [
+        {"order_in_scenario": 1, "prompt_pt": "Entregue seu passaporte dizendo 'aqui está, por favor'.", "expected_transcript": "パスポートです、どうぞ", "expected_romaji": "pasupooto desu, douzo"},
+        {"order_in_scenario": 2, "prompt_pt": "Pergunte qual é o portão de embarque.", "expected_transcript": "とうじょうぐちはどこですか", "expected_romaji": "toujouguchi wa doko desu ka"},
+        {"order_in_scenario": 3, "prompt_pt": "Pergunte se o voo está atrasado.", "expected_transcript": "フライトはおくれていますか", "expected_romaji": "furaito wa okurete imasu ka"},
+        {"order_in_scenario": 4, "prompt_pt": "Agradeça a atendente ao final.", "expected_transcript": "ありがとうございました", "expected_romaji": "arigatou gozaimashita"}
+      ]
+    },
+    {
+      "title_pt": "Jantar em família",
+      "context_description_pt": "Você está jantando na casa da família da sua namorada/esposa no Japão.",
+      "order_index": 3,
+      "exercises": [
+        {"order_in_scenario": 1, "prompt_pt": "Antes de comer, diga a expressão tradicional de agradecimento pela comida.", "expected_transcript": "いただきます", "expected_romaji": "itadakimasu"},
+        {"order_in_scenario": 2, "prompt_pt": "Elogie a comida dizendo que está deliciosa.", "expected_transcript": "とてもおいしいです", "expected_romaji": "totemo oishii desu"},
+        {"order_in_scenario": 3, "prompt_pt": "Peça para passarem o sal.", "expected_transcript": "しおをとってください", "expected_romaji": "shio wo totte kudasai"},
+        {"order_in_scenario": 4, "prompt_pt": "Ao terminar de comer, diga a expressão tradicional de agradecimento final.", "expected_transcript": "ごちそうさまでした", "expected_romaji": "gochisousama deshita"}
+      ]
+    }
+  ]
+}
