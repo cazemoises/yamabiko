@@ -8,10 +8,18 @@ interface DiffComparisonProps {
   expected: string;
   actual: string;
   diff: DiffEntry[];
+  language?: string;
 }
 
-export function DiffComparison({ expected, actual, diff }: DiffComparisonProps) {
-  const columns = alignForDisplay(expected, actual, diff);
+// Romaji só faz sentido como apoio de leitura pra kana — em inglês seria só
+// duplicar a mesma letra embaixo dela mesma, então fica desligado fora de ja-JP.
+function isJapanese(language: string): boolean {
+  return language.toLowerCase().startsWith("ja");
+}
+
+export function DiffComparison({ expected, actual, diff, language = "ja-JP" }: DiffComparisonProps) {
+  const columns = alignForDisplay(expected, actual, diff, language);
+  const showRomaji = isJapanese(language);
 
   return (
     <div className="diff-comparison">
@@ -19,16 +27,16 @@ export function DiffComparison({ expected, actual, diff }: DiffComparisonProps) 
         <span className="diff-row-label">Esperado</span>
         <div className="diff-chars">
           {columns.map((col) => (
-            <DiffChar key={col.position} char={col.expectedChar} mismatch={col.entry !== null} />
+            <DiffChar key={col.position} char={col.expectedChar} mismatch={col.entry !== null} showRomaji={showRomaji} />
           ))}
         </div>
-        <SpeakButton text={expected} className="speak-button-inline" />
+        <SpeakButton text={expected} lang={language} className="speak-button-inline" />
       </div>
       <div className="diff-row" data-testid="diff-row-actual">
         <span className="diff-row-label">Você disse</span>
         <div className="diff-chars">
           {columns.map((col) => (
-            <DiffChar key={col.position} char={col.actualChar} mismatch={col.entry !== null} />
+            <DiffChar key={col.position} char={col.actualChar} mismatch={col.entry !== null} showRomaji={showRomaji} />
           ))}
         </div>
       </div>
@@ -36,7 +44,7 @@ export function DiffComparison({ expected, actual, diff }: DiffComparisonProps) 
       {diff.length > 0 && (
         <ul className="diff-explanations" data-testid="diff-explanations">
           {diff.map((entry, index) => (
-            <li key={index}>{explainDiff(entry)}</li>
+            <li key={index}>{explainDiff(entry, language)}</li>
           ))}
         </ul>
       )}
@@ -44,7 +52,15 @@ export function DiffComparison({ expected, actual, diff }: DiffComparisonProps) 
   );
 }
 
-function DiffChar({ char, mismatch }: { char: string | null; mismatch: boolean }) {
+function DiffChar({
+  char,
+  mismatch,
+  showRomaji,
+}: {
+  char: string | null;
+  mismatch: boolean;
+  showRomaji: boolean;
+}) {
   if (char === null) {
     return (
       <span className="diff-char diff-char-gap" aria-hidden="true">
@@ -52,7 +68,7 @@ function DiffChar({ char, mismatch }: { char: string | null; mismatch: boolean }
       </span>
     );
   }
-  const romaji = toRomaji(char);
+  const romaji = showRomaji ? toRomaji(char) : null;
   return (
     <span className={mismatch ? "diff-char diff-char-mismatch" : "diff-char"}>
       <span className="diff-char-kana">{char}</span>

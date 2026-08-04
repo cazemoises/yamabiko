@@ -17,7 +17,7 @@ test.describe("interceptor de refresh de token", () => {
     let exercisesCalls = 0;
     let refreshCalls = 0;
 
-    await page.route(`${API_BASE_URL}/exercises`, async (route) => {
+    await page.route(`${API_BASE_URL}/exercises*`, async (route) => {
       const authHeader = route.request().headers()["authorization"];
       exercisesCalls++;
       if (authHeader === "Bearer expired-token") {
@@ -62,7 +62,7 @@ test.describe("interceptor de refresh de token", () => {
   });
 
   test("desloga e redireciona para /login quando o refresh token também é inválido", async ({ page }) => {
-    await page.route(`${API_BASE_URL}/exercises`, async (route) => {
+    await page.route(`${API_BASE_URL}/exercises*`, async (route) => {
       await route.fulfill({ status: 401, json: { error: "token expirado" } });
     });
 

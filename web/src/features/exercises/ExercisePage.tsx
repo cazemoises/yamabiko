@@ -44,7 +44,7 @@ export function ExercisePage() {
       <h1>{exercise.prompt_pt}</h1>
       <p className="expected-transcript">{exercise.expected_transcript}</p>
       {exercise.expected_romaji && <p className="expected-romaji">{exercise.expected_romaji}</p>}
-      <SpeakButton text={exercise.expected_transcript} />
+      <SpeakButton text={exercise.expected_transcript} lang={exercise.language || "ja-JP"} />
 
       <AudioRecorder onRecorded={handleRecorded} disabled={submitting} />
 
@@ -62,6 +62,7 @@ export function ExercisePage() {
               expected={exercise.expected_transcript}
               actual={result.transcript}
               diff={result.diff}
+              language={exercise.language || "ja-JP"}
             />
           )}
         </div>

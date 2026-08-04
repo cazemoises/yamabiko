@@ -207,6 +207,24 @@ li a {
   text-transform: uppercase;
 }
 
+.language-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.language-toggle-button {
+  font-size: 13px;
+  padding: 6px 14px;
+  opacity: 0.6;
+}
+
+.language-toggle-button.active {
+  opacity: 1;
+  background: var(--accent);
+  color: var(--bg);
+}
+
 .attempt-result {
   border: 1px solid var(--border);
   border-radius: 4px;

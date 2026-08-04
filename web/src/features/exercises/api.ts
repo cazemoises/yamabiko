@@ -40,9 +40,12 @@ export interface Attempt {
   created_at: string;
 }
 
-export function listExercises(sprintDay?: number): Promise<Exercise[]> {
-  const query = sprintDay !== undefined ? `?sprint_day=${sprintDay}` : "";
-  return api.get<Exercise[]>(`/exercises${query}`);
+export function listExercises(sprintDay?: number, language?: string): Promise<Exercise[]> {
+  const params = new URLSearchParams();
+  if (sprintDay !== undefined) params.set("sprint_day", String(sprintDay));
+  if (language) params.set("language", language);
+  const query = params.toString();
+  return api.get<Exercise[]>(`/exercises${query ? `?${query}` : ""}`);
 }
 
 export function getExercise(id: string): Promise<Exercise> {
