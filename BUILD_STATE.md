@@ -3,6 +3,41 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**UX do resultado do desafio redesenhada** (item 2/3 do pedido do usuário nesta sessão): antes, uma
+divergência aparecia como `SUBSTITUTE — esperado "わ", transcrito "お" (OUTRO)` — ilegível pra quem não lê
+kana fluente e expõe rótulo técnico cru pro aluno.
+
+- `web/src/lib/kanaAlign.ts`: reconstrói as duas strings alinhadas (esperado x transcrito, com "gaps"
+  nas posições de INSERT/DELETE) a partir do texto completo + do array `diff` que o backend já manda —
+  **sem duplicar o Levenshtein no cliente**. Cada `DiffEntry.position` já é o índice da coluna na
+  sequência de alinhamento completa (matches inclusos, ver `compare.go`); posições sem entrada em `diff`
+  são match. `normalizeKana()` espelha `comparison.normalize()` do backend (NFKC + remove espaço +
+  katakana→hiragana) só o suficiente pra manter os índices de posição válidos — a nota de grading
+  continua 100% autoritativa no backend, isso é só pra renderização.
+- `web/src/lib/romaji.ts`: tabela hiragana→romaji mora-a-mora (gojuon + dakuten/handakuten + kana
+  pequeno), cobertura suficiente pro conteúdo do produto (zero kanji, Sec. 10 do CLAUDE.md).
+- `web/src/features/exercises/diffExplain.ts`: traduz `Pattern`+`Op` numa frase em português (ex: literal
+  do pedido do usuário — `Você disse "o" (お) onde devia ser "wa" (わ) — confusão comum entre esses
+  sons.`); patterns conhecidos (H_ASPIRADO_OMITIDO/VOGAL_ENGOLIDA/R_L_T_CONFUSAO) têm frase específica,
+  OUTRO/INSERT caem num fallback genérico mas ainda em português, nunca o rótulo técnico cru.
+- `web/src/features/exercises/DiffComparison.tsx`: duas linhas lado a lado ("Esperado" / "Você disse"),
+  cada mora divergente com highlight visual (fundo + sublinhado na cor de erro) e o romaji aparecendo
+  embaixo do kana só nas moras destacadas; lista de explicações em português abaixo.
+- TDD literal: `web/e2e/diff-display.spec.ts` (Playwright) escrito primeiro, RED confirmado (elemento
+  `diff-row-expected` não existia ainda), só depois implementado o resto. O teste dirige o fluxo real de
+  gravação (clica Gravar → Parar gravação → Enviar) usando o Chromium com `--use-fake-device-for-media-
+  stream`/`--use-fake-ui-for-media-stream` (tom sintético, sem interação manual de permissão) — mockando
+  só as chamadas de rede (`GET /exercises/:id`, `POST /exercises/:id/attempts`), não o STT real.
+  `playwright.config.ts` ganhou `permissions: ["microphone"]` + esses `launchOptions.args` (reaproveitável
+  pro item 3, indicador de volume).
+- `e2e/helpers.ts` extraído de `token-refresh.spec.ts` (só `seedTokensOnce`) pra reuso entre specs, sem
+  duplicar a pegadinha do `addInitScript` rodando em toda navegação.
+- Revisão visual manual via screenshot Playwright (script descartável, não commitado) confirmou o
+  highlight + romaji + explicação renderizando como esperado, dentro da estética "Tactical Telemetry"
+  (JetBrains Mono, cores do tema) já usada no resto do `web`.
+- `tsc -b && vite build`, `oxlint` e os 3 specs e2e (`token-refresh` + `diff-display`) passando.
+
+## Última ação (pós-Fase 6, bug do classificador — histórico)
 **Bug real corrigido: classificador de `phonetic_diff` devolvendo `OUTRO` pra quase toda divergência**
 (item 1/3 do pedido do usuário nesta sessão, prioridade máxima por ser bug de lógica de negócio — TDD
 literal, RED confirmado antes da correção).
@@ -229,12 +264,10 @@ negócio, tratado com TDD; itens 2 e 3 são UX):
 1. **[CONCLUÍDO]** Bug no classificador de `phonetic_diff` — corrigido (`classifySubstitute` agora
    reconhece confusão entre vogais puras como `VOGAL_ENGOLIDA`, não só pares ら/た-row). Ver "Última
    ação" acima.
-2. **[PRÓXIMO]** UX do resultado do desafio: highlight visual dos caracteres divergentes lado a lado
-   (esperado vs. transcrito), romaji junto de cada trecho divergente, labels técnicos
-   (SUBSTITUTE/INSERT/OUTRO) trocados por explicação em português pro aluno. Teste e2e Playwright
-   cobrindo a nova exibição.
-3. Indicador de volume em tempo real durante a gravação (`AnalyserNode` da Web Audio API sobre o stream
-   do `MediaRecorder` já existente em `components/audio/`).
+2. **[CONCLUÍDO]** UX do resultado do desafio redesenhada (highlight lado a lado + romaji + explicação em
+   português). Ver "Última ação" acima.
+3. **[PRÓXIMO]** Indicador de volume em tempo real durante a gravação (`AnalyserNode` da Web Audio API
+   sobre o stream do `MediaRecorder` já existente em `components/audio/`).
 
 Commit separado por item, `BUILD_STATE.md` atualizado ao final de cada um.
 

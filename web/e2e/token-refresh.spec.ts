@@ -1,22 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
-
-const API_BASE_URL = "http://localhost:9001";
-
-// addInitScript roda em toda navegação da página (inclusive o redirect pra /login que
-// o interceptor dispara), então sem essa guarda ele re-semearia os tokens depois do
-// logout e mascararia o clearTokens(). sessionStorage sobrevive à navegação (mesma aba),
-// diferente de uma variável em memória, então serve de flag "já semeei".
-async function seedTokensOnce(page: Page, accessToken: string, refreshToken: string): Promise<void> {
-  await page.addInitScript(
-    ({ accessToken, refreshToken }) => {
-      if (sessionStorage.getItem("e2e-seeded")) return;
-      sessionStorage.setItem("e2e-seeded", "1");
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", refreshToken);
-    },
-    { accessToken, refreshToken },
-  );
-}
+import { test, expect } from "@playwright/test";
+import { API_BASE_URL, seedTokensOnce } from "./helpers";
 
 const EXERCISE = {
   id: "ex-1",

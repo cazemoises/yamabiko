@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getExercise, submitAttempt, type AttemptResult, type Exercise } from "./api";
 import { AudioRecorder } from "../../components/audio/AudioRecorder";
+import { DiffComparison } from "./DiffComparison";
 import { ApiError } from "../../lib/apiClient";
 
 export function ExercisePage() {
@@ -55,17 +56,11 @@ export function ExercisePage() {
           <p>Veredito: {result.verdict}</p>
           <p>XP ganho: +{result.xp_gained}</p>
           {result.diff.length > 0 && (
-            <details>
-              <summary>Divergências ({result.diff.length})</summary>
-              <ul>
-                {result.diff.map((entry, index) => (
-                  <li key={index}>
-                    {entry.op} — esperado &quot;{entry.expected ?? "—"}&quot;, transcrito &quot;
-                    {entry.actual ?? "—"}&quot; ({entry.pattern})
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <DiffComparison
+              expected={exercise.expected_transcript}
+              actual={result.transcript}
+              diff={result.diff}
+            />
           )}
         </div>
       )}

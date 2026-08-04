@@ -212,6 +212,83 @@ li a {
   border-color: var(--fail);
 }
 
+.diff-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.diff-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.diff-row-label {
+  flex-shrink: 0;
+  width: 72px;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.diff-chars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.diff-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 1.4em;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 20px;
+  color: var(--text-h);
+}
+
+.diff-char-kana {
+  line-height: 1;
+}
+
+.diff-char-romaji {
+  font-size: 10px;
+  line-height: 1;
+  margin-top: 2px;
+  color: var(--fail);
+  text-transform: lowercase;
+}
+
+.diff-char-mismatch {
+  background: color-mix(in srgb, var(--fail) 18%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--fail);
+  text-decoration-thickness: 2px;
+}
+
+.diff-char-gap .diff-char-kana {
+  color: var(--border);
+}
+
+.diff-explanations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.diff-explanations li {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-alt);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
