@@ -3,6 +3,35 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Correção de escopo da taxonomia fonética: nova categoria `SONORIZACAO_CONFUSA`** (pedido de follow-up
+do usuário — reavaliação da classificação anterior de す/ず como "genuíno non-fit" em `OUTRO`).
+
+- A diferença す/ず (e か/が, た/だ, は/ば) é **sonorização (dakuten)** — vibração das cordas vocais, um
+  padrão fonético real e sistemático pra falantes de PT-BR, não ruído aleatório. Classificar como OUTRO
+  era escopo raso da taxonomia original (Sec. 3 do CLAUDE.md só previa 3 padrões), não um erro de lógica
+  como o bug corrigido antes — por isso tratado como correção de escopo, não bugfix.
+- `core-api/internal/comparison/compare.go`: nova constante `PatternSonorizacaoConfusa =
+  "SONORIZACAO_CONFUSA"` + `dakutenPairs` (mapa surda→sonora dos 4 pares k/g, s/z, t/d, h/b) +
+  `isDakutenPair()` (funciona nos dois sentidos). `わ->お` deliberadamente **não** virou categoria — sem
+  justificativa fonológica clara o suficiente (não é par base/dakuten, vogal pura, nem ら/た-row),
+  continua `OUTRO` por decisão explícita do usuário.
+- **Efeito colateral encontrado e corrigido durante a implementação**: `た`/`だ` já estavam ambos dentro
+  do antigo `rltConfusable` (usado por `R_L_T_CONFUSAO`), então `た<->だ` seria capturado por
+  R_L_T_CONFUSAO antes de chegar no novo case de sonorização — colisão de taxonomia. Corrigido separando
+  `rltConfusable` em `rRow` (só ら行) + `tdRow` (た/だ行) e criando `isRLTConfusion()`, que só classifica
+  como R_L_T_CONFUSAO quando **ら realmente participa** da substituição — `た<->だ` (sonorização pura,
+  sem ら envolvido) passou a cair corretamente em `SONORIZACAO_CONFUSA`. Coberto por teste dedicado
+  (`TestCompare_DetectsRLTConfusao_NaoConflitaComSonorizacao`) pra não regredir.
+- TDD literal: `TestCompare_DetectsSonorizacaoConfusa_SuZu` (o par real de produção) escrito primeiro,
+  RED confirmado via falha de compilação (`PatternSonorizacaoConfusa` não existia) — só depois
+  implementado o resto. Também: `TestCompare_DetectsSonorizacaoConfusa_TodosOsParesBaseDakuten` (os 4
+  pares nos dois sentidos) e `TestCompare_WaParaO_PermaneceOutro` (documenta a decisão de manter わ/お
+  fora da taxonomia). `TestCompare_VoicingConfusion_SuZu_RemainsOutro` (antigo teste que travava す/ず em
+  OUTRO) foi **renomeado e reinvertido**, não apagado silenciosamente — reflete a mudança de decisão, não
+  perda de cobertura.
+- `go test ./...` (todos os pacotes) e `go vet ./...` limpos.
+
+## Última ação (pós-Fase 6, indicador de volume — histórico)
 **Indicador de volume em tempo real durante a gravação** (item 3/3, último do pedido do usuário nesta
 sessão — os 3 itens estão concluídos e commitados individualmente).
 

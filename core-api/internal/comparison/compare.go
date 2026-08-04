@@ -20,10 +20,11 @@ const (
 type ErrorPattern string
 
 const (
-	PatternHAspiradoOmitido ErrorPattern = "H_ASPIRADO_OMITIDO"
-	PatternVogalEngolida    ErrorPattern = "VOGAL_ENGOLIDA"
-	PatternRLTConfusao      ErrorPattern = "R_L_T_CONFUSAO"
-	PatternOutro            ErrorPattern = "OUTRO"
+	PatternHAspiradoOmitido   ErrorPattern = "H_ASPIRADO_OMITIDO"
+	PatternVogalEngolida      ErrorPattern = "VOGAL_ENGOLIDA"
+	PatternRLTConfusao        ErrorPattern = "R_L_T_CONFUSAO"
+	PatternSonorizacaoConfusa ErrorPattern = "SONORIZACAO_CONFUSA"
+	PatternOutro              ErrorPattern = "OUTRO"
 )
 
 type DiffOp string
@@ -55,12 +56,27 @@ var hRow = map[rune]bool{'は': true, 'ひ': true, 'ふ': true, 'へ': true, '�
 // pureVowels são as moras vocálicas puras, alvo comum de "engolir" a vogal.
 var pureVowels = map[rune]bool{'あ': true, 'い': true, 'う': true, 'え': true, 'お': true}
 
-// rltConfusable agrupa o ら行 com た/だ行: o flap japonês de ら é frequentemente
-// percebido/pronunciado por falantes de PT-BR como um L, T ou D.
-var rltConfusable = map[rune]bool{
-	'ら': true, 'り': true, 'る': true, 'れ': true, 'ろ': true,
+// rRow é o ら行 — o flap japonês de ら é frequentemente percebido/pronunciado
+// por falantes de PT-BR como um L, T ou D.
+var rRow = map[rune]bool{'ら': true, 'り': true, 'る': true, 'れ': true, 'ろ': true}
+
+// tdRow é o た/だ行 (surdo e sonoro juntos) — o outro lado da confusão com ら.
+// Fica separado de rRow porque nem toda substituição dentro de tdRow envolve
+// ら (ex: た<->だ é sonorização pura, ver dakutenPairs/isRLTConfusion abaixo).
+var tdRow = map[rune]bool{
 	'た': true, 'ち': true, 'つ': true, 'て': true, 'と': true,
 	'だ': true, 'ぢ': true, 'づ': true, 'で': true, 'ど': true,
+}
+
+// dakutenPairs mapeia cada mora surda pra sua contraparte sonorizada (dakuten)
+// nos 4 pares fonológicos k/g, s/z, t/d, h/b — a diferença entre elas é só a
+// vibração das cordas vocais (sonorização), um padrão de confusão real e
+// sistemático pra falantes de PT-BR aprendendo japonês (não ruído aleatório).
+var dakutenPairs = map[rune]rune{
+	'か': 'が', 'き': 'ぎ', 'く': 'ぐ', 'け': 'げ', 'こ': 'ご',
+	'さ': 'ざ', 'し': 'じ', 'す': 'ず', 'せ': 'ぜ', 'そ': 'ぞ',
+	'た': 'だ', 'ち': 'ぢ', 'つ': 'づ', 'て': 'で', 'と': 'ど',
+	'は': 'ば', 'ひ': 'び', 'ふ': 'ぶ', 'へ': 'べ', 'ほ': 'ぼ',
 }
 
 // Compare normaliza as duas strings, calcula a distância de Levenshtein a nível
@@ -134,8 +150,10 @@ func classifyDelete(expected rune) ErrorPattern {
 
 func classifySubstitute(expected, actual rune) ErrorPattern {
 	switch {
-	case rltConfusable[expected] && rltConfusable[actual]:
+	case isRLTConfusion(expected, actual):
 		return PatternRLTConfusao
+	case isDakutenPair(expected, actual):
+		return PatternSonorizacaoConfusa
 	case pureVowels[expected] && pureVowels[actual]:
 		// Confusão entre duas vogais puras (ex: え/い) é o mesmo problema de
 		// qualidade vocálica da VOGAL_ENGOLIDA, só que via substituição em vez
@@ -144,6 +162,18 @@ func classifySubstitute(expected, actual rune) ErrorPattern {
 	default:
 		return PatternOutro
 	}
+}
+
+// isRLTConfusion é true só quando ら (ou outra mora de rRow) está de um dos
+// lados — sem isso, た<->だ (nenhum dos dois em rRow) cairia aqui também, o
+// que misturaria a confusão com ら com a sonorização pura de isDakutenPair.
+func isRLTConfusion(expected, actual rune) bool {
+	return (rRow[expected] && (rRow[actual] || tdRow[actual])) ||
+		(rRow[actual] && (rRow[expected] || tdRow[expected]))
+}
+
+func isDakutenPair(expected, actual rune) bool {
+	return dakutenPairs[expected] == actual || dakutenPairs[actual] == expected
 }
 
 // normalize remove todo espaço em branco, aplica NFKC (unifica formas de

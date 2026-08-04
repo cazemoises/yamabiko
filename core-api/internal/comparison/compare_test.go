@@ -143,12 +143,14 @@ func TestCompare_DetectsVogalEngolida_ViaSubstituicao(t *testing.T) {
 
 func TestCompare_MixedProductionSubstitutions_NotAllOutro(t *testing.T) {
 	// Os 3 pares observados em produção (Sec. de bug report): わ->お, え->い, す->ず.
-	// Antes da correção, classifySubstitute só reconhecia pares ら/た-row
-	// (R_L_T_CONFUSAO), então TODOS os 3 caíam em OUTRO — o bug reportado. Depois
-	// da correção, え->い (par de vogais puras) deve bater em VOGAL_ENGOLIDA; わ->お
-	// e す->ず genuinamente não se encaixam em nenhum padrão conhecido (nem
-	// h-aspirado, nem par de vogais puras, nem ら/た-row) e permanecem OUTRO —
-	// o que é aceitável, desde que não seja 100% dos casos.
+	// Antes da 1ª correção, classifySubstitute só reconhecia pares ら/た-row
+	// (R_L_T_CONFUSAO), então TODOS os 3 caíam em OUTRO — o bug original. Depois
+	// dela, え->い (par de vogais puras) passou a bater em VOGAL_ENGOLIDA. Numa
+	// 2ª correção (revisão de taxonomia), す->ず passou a bater em
+	// SONORIZACAO_CONFUSA (par base/dakuten). わ->お genuinamente não se encaixa
+	// em nenhum padrão conhecido (nem h-aspirado, nem vogal pura, nem ら/た-row,
+	// nem base/dakuten) e permanece OUTRO — o que é aceitável, desde que não
+	// seja 100% dos casos.
 	result := comparison.Compare("わえす", "おいず")
 
 	if len(result.PhoneticDiff) != 3 {
@@ -174,16 +176,67 @@ func TestCompare_MixedProductionSubstitutions_NotAllOutro(t *testing.T) {
 	}
 }
 
-func TestCompare_VoicingConfusion_SuZu_RemainsOutro(t *testing.T) {
-	// す->ず: diferem só pelo dakuten (sonorização), não coberto por nenhum dos 3
-	// padrões definidos na Sec. 3 do CLAUDE.md — permanece OUTRO legitimamente.
+func TestCompare_DetectsSonorizacaoConfusa_SuZu(t *testing.T) {
+	// Achado real de produção: esperado「す」, transcrito「ず」 — diferem só pela
+	// sonorização (dakuten), um padrão fonético real e sistemático pra falantes
+	// de PT-BR, não "ruído aleatório" (revisão de escopo da taxonomia — antes
+	// caía em OUTRO por não haver categoria própria pra isso).
 	result := comparison.Compare("す", "ず")
 
 	if len(result.PhoneticDiff) != 1 {
 		t.Fatalf("esperava 1 entrada no diff, veio %d", len(result.PhoneticDiff))
 	}
+	entry := result.PhoneticDiff[0]
+	if entry.Op != comparison.OpSubstitute {
+		t.Fatalf("esperava SUBSTITUTE, veio %v", entry.Op)
+	}
+	if entry.Pattern != comparison.PatternSonorizacaoConfusa {
+		t.Fatalf("esperava SONORIZACAO_CONFUSA, veio %v", entry.Pattern)
+	}
+}
+
+func TestCompare_DetectsSonorizacaoConfusa_TodosOsParesBaseDakuten(t *testing.T) {
+	// Os 4 pares fonológicos base/dakuten (surda/sonora): k/g, s/z, t/d, h/b —
+	// nos dois sentidos (surda->sonora e sonora->surda).
+	cases := []struct{ expected, actual string }{
+		{"か", "が"}, {"が", "か"}, // k/g
+		{"す", "ず"}, {"ず", "す"}, // s/z
+		{"た", "だ"}, {"だ", "た"}, // t/d
+		{"は", "ば"}, {"ば", "は"}, // h/b
+	}
+	for _, c := range cases {
+		result := comparison.Compare(c.expected, c.actual)
+		if len(result.PhoneticDiff) != 1 {
+			t.Fatalf("%s->%s: esperava 1 entrada no diff, veio %d", c.expected, c.actual, len(result.PhoneticDiff))
+		}
+		if result.PhoneticDiff[0].Pattern != comparison.PatternSonorizacaoConfusa {
+			t.Fatalf("%s->%s: esperava SONORIZACAO_CONFUSA, veio %v", c.expected, c.actual, result.PhoneticDiff[0].Pattern)
+		}
+	}
+}
+
+func TestCompare_WaParaO_PermaneceOutro(t *testing.T) {
+	// わ->お: sem justificativa fonológica clara o suficiente pra virar
+	// categoria própria (não é par base/dakuten, nem vogal pura, nem ら/た-row)
+	// — permanece OUTRO deliberadamente.
+	result := comparison.Compare("わ", "お")
+
+	if len(result.PhoneticDiff) != 1 {
+		t.Fatalf("esperava 1 entrada no diff, veio %d", len(result.PhoneticDiff))
+	}
 	if result.PhoneticDiff[0].Pattern != comparison.PatternOutro {
-		t.Fatalf("esperava OUTRO pra す->ず, veio %v", result.PhoneticDiff[0].Pattern)
+		t.Fatalf("esperava OUTRO pra わ->お, veio %v", result.PhoneticDiff[0].Pattern)
+	}
+}
+
+func TestCompare_DetectsRLTConfusao_NaoConflitaComSonorizacao(t *testing.T) {
+	// た->だ é um par base/dakuten (t/d) — não envolve ら, então não deve ser
+	// classificado como R_L_T_CONFUSAO mesmo だ/た estando no mesmo conjunto de
+	// moras usado pra detectar confusão com ら (ver rRow/tdRow em compare.go).
+	result := comparison.Compare("た", "だ")
+
+	if result.PhoneticDiff[0].Pattern == comparison.PatternRLTConfusao {
+		t.Fatalf("た->だ não deveria bater em R_L_T_CONFUSAO (não envolve ら), veio %v", result.PhoneticDiff[0].Pattern)
 	}
 }
 
