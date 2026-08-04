@@ -3,6 +3,24 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Romaji em todos os caracteres do comparador de diff, não só nos divergentes** (follow-up de UX sobre o
+item 2/3 da sessão anterior).
+
+- `web/src/features/exercises/DiffComparison.tsx`: `DiffChar` agora chama `toRomaji()` incondicionalmente
+  (antes só quando `mismatch`), pra manter a leitura fluida da frase inteira nas duas linhas
+  (ESPERADO/VOCÊ DISSE) em vez de só mostrar romaji nos trechos que erraram.
+- `web/src/index.css`: `.diff-char-romaji` virou a cor discreta padrão (neutra, `opacity: 0.55`, usa
+  `var(--text)`) pros caracteres corretos; nova classe `.diff-char-romaji-mismatch` (aplicada só nas
+  moras divergentes, como antes) restaura a cor de erro (`var(--fail)`) + `font-weight: 600` — destaque
+  continua exclusivo dos erros, o romaji neutro é só leitura de apoio.
+- TDD: `web/e2e/diff-display.spec.ts` atualizado primeiro — fixture trocada pra incluir um caractere que
+  bate certo (`た`) ao lado do divergente (`わ`/`お`) nas duas linhas, RED confirmado (elemento
+  `.diff-char-romaji-mismatch` não existia ainda), só depois implementado o CSS/componente.
+- Revisão visual manual (screenshot Playwright descartável) confirmou romaji cinza discreto nos
+  caracteres corretos e vermelho destacado só no divergente.
+- `go test`/`tsc -b && vite build`/`oxlint`/e2e (4 specs) todos passando.
+
+## Última ação (correção de taxonomia fonética — histórico)
 **Correção de escopo da taxonomia fonética: nova categoria `SONORIZACAO_CONFUSA`** (pedido de follow-up
 do usuário — reavaliação da classificação anterior de す/ず como "genuíno non-fit" em `OUTRO`).
 

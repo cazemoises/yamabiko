@@ -50,11 +50,15 @@ function DiffChar({ char, mismatch }: { char: string | null; mismatch: boolean }
       </span>
     );
   }
-  const romaji = mismatch ? toRomaji(char) : "";
+  const romaji = toRomaji(char);
   return (
     <span className={mismatch ? "diff-char diff-char-mismatch" : "diff-char"}>
       <span className="diff-char-kana">{char}</span>
-      {romaji && <span className="diff-char-romaji">{romaji}</span>}
+      {romaji && (
+        <span className={mismatch ? "diff-char-romaji diff-char-romaji-mismatch" : "diff-char-romaji"}>
+          {romaji}
+        </span>
+      )}
     </span>
   );
 }

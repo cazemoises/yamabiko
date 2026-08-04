@@ -275,8 +275,15 @@ li a {
   font-size: 10px;
   line-height: 1;
   margin-top: 2px;
-  color: var(--fail);
+  color: var(--text);
+  opacity: 0.55;
   text-transform: lowercase;
+}
+
+.diff-char-romaji-mismatch {
+  color: var(--fail);
+  opacity: 1;
+  font-weight: 600;
 }
 
 .diff-char-mismatch {

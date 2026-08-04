@@ -6,18 +6,19 @@ const EXERCISE = {
   category: "saudacao",
   difficulty: 1,
   prompt_pt: "Diga que o dia está bonito",
-  expected_transcript: "わ",
+  expected_transcript: "わた",
   sprint_day_ref: 1,
 };
 
 // Par observado em produção (BUILD_STATE.md): esperado「わ」, transcrito「お」 —
 // não bate em nenhum padrão fonético conhecido, então o backend classifica como
 // OUTRO. É o pior caso pra UX: sem highlight/romaji/explicação, sobra só um rótulo
-// técnico ilegível pra quem não lê japonês fluente.
+// técnico ilegível pra quem não lê japonês fluente. た casa em ambos (match), pra
+// cobrir que o romaji dos caracteres corretos também aparece, só que discreto.
 const ATTEMPT_RESULT = {
-  transcript: "お",
-  score: 0.0,
-  verdict: "FAIL",
+  transcript: "おた",
+  score: 0.5,
+  verdict: "PARTIAL",
   diff: [{ op: "SUBSTITUTE", position: 0, expected: "わ", actual: "お", pattern: "OUTRO" }],
   xp_gained: 0,
 };
@@ -51,9 +52,16 @@ test("resultado do desafio destaca a divergência, mostra romaji e explica em po
   await expect(expectedRow.locator(".diff-char-mismatch")).toHaveText(/わ/);
   await expect(actualRow.locator(".diff-char-mismatch")).toHaveText(/お/);
 
-  // Romaji de cada trecho divergente, junto ao kana.
-  await expect(expectedRow.getByText("wa")).toBeVisible();
-  await expect(actualRow.getByText("o", { exact: true })).toBeVisible();
+  // Romaji do trecho divergente, destacado.
+  await expect(expectedRow.locator(".diff-char-romaji-mismatch")).toHaveText("wa");
+  await expect(actualRow.locator(".diff-char-romaji-mismatch")).toHaveText("o");
+
+  // Romaji também aparece nos caracteres que bateram certo (た em ambas as
+  // linhas), só que discreto — sem a classe de destaque dos divergentes.
+  const expectedNeutralRomaji = expectedRow.locator(".diff-char-romaji:not(.diff-char-romaji-mismatch)");
+  const actualNeutralRomaji = actualRow.locator(".diff-char-romaji:not(.diff-char-romaji-mismatch)");
+  await expect(expectedNeutralRomaji).toHaveText("ta");
+  await expect(actualNeutralRomaji).toHaveText("ta");
 
   // Explicação em português voltada ao aluno, não o rótulo técnico cru.
   const explanations = page.getByTestId("diff-explanations");
