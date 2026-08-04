@@ -6,6 +6,17 @@ services:
     volumes:
       - whisper-models:/root/.cache/huggingface
 
+  # VOICEVOX (motor de TTS japonês open-source) gera o áudio de referência de
+  # pronúncia pros exercícios ja-JP (Sec. pedida pelo usuário). Variante CPU
+  # (cpu-latest) porque não assumimos GPU disponível — mesma decisão de
+  # stt-service/whisper_engine.py (device="cpu"). Sem `ports:` de propósito:
+  # só o core-api precisa falar com ele, então fica só na rede interna do
+  # compose (alcançável via `http://voicevox:50021`), sem expor porta no host.
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-latest
+    expose:
+      - "50021"
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -32,12 +43,20 @@ services:
       - PORT=8080
       - STT_SERVICE_URL=http://stt-service:8000
       - CORS_ALLOWED_ORIGINS=http://localhost:5173
+      - VOICEVOX_URL=http://voicevox:50021
+      - VOICEVOX_SPEAKER_ID=1
+      - AUDIO_CACHE_DIR=/app/audio-cache
+    volumes:
+      - audio-cache:/app/audio-cache
     depends_on:
       postgres:
         condition: service_healthy
       stt-service:
         condition: service_started
+      voicevox:
+        condition: service_started
 
 volumes:
   whisper-models:
   postgres-data:
+  audio-cache:
