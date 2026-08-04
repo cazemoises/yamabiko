@@ -3,6 +3,45 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Interceptor de refresh automático de access token no `web`** (pedido explícito do usuário — item de
+débito técnico não listado antes, mas real: antes desta sessão o frontend não tratava expiração de JWT,
+exigindo relogin manual mesmo com `/auth/refresh` já implementado no `core-api` desde a Fase 2).
+
+- TDD literal: escrito primeiro `web/e2e/token-refresh.spec.ts` (Playwright), rodado e confirmado RED
+  (falhava porque o 401 simplesmente virava "Erro ao carregar exercícios" na tela, sem tentativa de
+  refresh) — só depois implementado o interceptor.
+- `web/src/lib/apiClient.ts`: a função interna `request()` agora detecta `401` em qualquer chamada que
+  não seja pra `/auth/*`, chama `POST /auth/refresh` com o `refresh_token` salvo, salva o `access_token`
+  novo (`setAccessToken`, adicionado em `auth.ts`) e **repete a requisição original automaticamente**
+  (`isRetry=true` evita loop infinito se o retry também tomar 401). Se o refresh falhar (refresh token
+  também expirado/inválido), `clearTokens()` + `window.location.assign("/login")` — logout real, não só
+  estado React, porque o `apiClient` não tem acesso ao `AuthContext` (module fora da árvore React); um
+  reload completo re-inicializa o `AuthProvider` a partir do `localStorage` já limpo.
+- **Dedup de refreshes concorrentes**: `refreshInFlight` (promise module-level) garante que, se duas
+  chamadas tomarem 401 ao mesmo tempo (ex: efeitos duplos do React StrictMode em dev), só uma chamada
+  real pro `/auth/refresh` acontece — a segunda espera a mesma promise. Validado pelo próprio teste e2e
+  (roda contra o Vite dev server, que tem StrictMode ligado): `refreshCalls` sempre 1, mesmo com o efeito
+  de carregamento disparando 2x.
+- Testes e2e (`web/e2e/token-refresh.spec.ts`, `@playwright/test` adicionado como devDependency, script
+  `npm run test:e2e`) mockam o `core-api` via `page.route` (sem precisar do stack Docker rodando):
+  1. Access token inválido → 401 → refresh automático → requisição original repetida com o token novo →
+     tela de exercícios carrega normalmente, sem exigir novo login.
+  2. Access token **e** refresh token inválidos → refresh falha → `localStorage` limpo e redirect real
+     pra `/login`.
+  - Pegadinha encontrada e corrigida durante a escrita do teste: `page.addInitScript` roda em **toda**
+    navegação da página, então sem uma guarda (flag em `sessionStorage`, que sobrevive à navegação) ele
+    re-semeava os tokens expirados depois do redirect pro `/login`, mascarando o `clearTokens()` real.
+- **TTL do access token confirmado**: `core-api/internal/config/config.go` — `AccessTokenTTL: 15 *
+  time.Minute`, hardcoded (sem env var própria, diferente de `JWT_SECRET`/`DATABASE_URL`/etc). Não é
+  "minutos" a ponto de atrapalhar teste manual de sessão curta, mas é curto o bastante que sem esse
+  interceptor o relogin manual acontecia com frequência real durante desenvolvimento. **Decisão: não
+  mexer no valor** — o pedido explícito era resolver o sintoma via refresh automático, o que este
+  interceptor já faz; se o TTL incomodar no futuro, é uma mudança de uma linha (`config.go:45`),
+  documentada aqui pra quem for revisitar.
+- `tsc -b && vite build` e `oxlint` seguem limpos (único warning é pré-existente, `AuthContext.tsx`
+  exportando um hook junto do componente — não relacionado a esta mudança).
+
+## Última ação (pós-Fase 6, CORS + layout — histórico)
 Corrigidos dois bugs reais encontrados na primeira verificação de browser de verdade do `web`
 (o item #1 do débito técnico anterior — nesta sessão consegui instalar Playwright via `npx` no
 scratchpad e rodar um browser Chromium de verdade, então a ressalva "não testado em browser" da Fase 5
@@ -155,13 +194,25 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
     do CLAUDE.md), não esquecimento.
 
 ## Próximo passo imediato
-Todas as 6 fases do MVP end-to-end estão implementadas e verificadas — incluindo o `web` num browser
-real, não só build/tsc. Não há mais nenhuma fase pendente do CLAUDE.md original. Se reabrir uma sessão
-sem instrução nova do usuário: (a) rodar a suite completa (`go test ./...` em `core-api`, `npm run
-build` em `web`) pra confirmar que nada quebrou; (b) atacar o item 1 do débito técnico (transação nos
-efeitos colaterais de `attempts.Submit`) ou o item 2 (Redis + revogação de refresh token), que são os
-próximos de maior impacto técnico real; (c) considerar trocar o N+1 do dashboard (item 7) pelos
-endpoints agregados que já existem no backend.
+Pedido explícito do usuário nesta sessão, três itens em ordem de prioridade (item 1 é bug de lógica de
+negócio, tratado com TDD; itens 2 e 3 são UX):
+1. **[EM ANDAMENTO] Bug no classificador de `phonetic_diff`** — `comparison/` está devolvendo `OUTRO`
+   pra quase toda divergência, incluindo pares que deveriam bater em padrões conhecidos
+   (`H_ASPIRADO_OMITIDO`, `VOGAL_ENGOLIDA`, `R_L_T_CONFUSAO`). Casos de produção observados a cobrir com
+   teste: esperado「わ」/transcrito「お」, esperado「え」/transcrito「い」, esperado「す」/transcrito「ず」.
+2. UX do resultado do desafio: highlight visual dos caracteres divergentes lado a lado (esperado vs.
+   transcrito), romaji junto de cada trecho divergente, labels técnicos (SUBSTITUTE/INSERT/OUTRO)
+   trocados por explicação em português pro aluno. Teste e2e Playwright cobrindo a nova exibição.
+3. Indicador de volume em tempo real durante a gravação (`AnalyserNode` da Web Audio API sobre o stream
+   do `MediaRecorder` já existente em `components/audio/`).
+
+Commit separado por item, `BUILD_STATE.md` atualizado ao final de cada um.
+
+Se reabrir uma sessão sem instrução nova do usuário e os 3 itens acima já estiverem commitados: (a)
+rodar a suite completa (`go test ./...` em `core-api`, `npm run build && npm run test:e2e` em `web`) pra
+confirmar que nada quebrou; (b) atacar o item 1 do débito técnico abaixo (transação nos efeitos
+colaterais de `attempts.Submit`) ou o item 2 (Redis + revogação de refresh token); (c) considerar trocar
+o N+1 do dashboard (item 7) pelos endpoints agregados que já existem no backend.
 
 ---
 
