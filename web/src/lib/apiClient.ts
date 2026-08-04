@@ -41,7 +41,11 @@ function redirectToLogin(): void {
   window.location.assign("/login");
 }
 
-async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+// requestRaw concentra a lógica de auth + retry de refresh compartilhada por
+// request() (respostas JSON) e requestBlob() (respostas binárias, ex: WAV do
+// endpoint de áudio de referência) — só o parsing do corpo de sucesso difere
+// entre as duas.
+async function requestRaw(path: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
   const token = getAccessToken();
   const headers = new Headers(options.headers);
   if (token) {
@@ -63,17 +67,27 @@ async function request<T>(path: string, options: RequestInit = {}, isRetry = fal
       redirectToLogin();
       throw new ApiError(401, "sessão expirada");
     }
-    return request<T>(path, options, true);
+    return requestRaw(path, options, true);
   }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as { error?: string });
     throw new ApiError(response.status, body.error ?? `Erro ${response.status}`);
   }
+  return response;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await requestRaw(path, options);
   if (response.status === 204) {
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+async function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  const response = await requestRaw(path, options);
+  return response.blob();
 }
 
 export const api = {
@@ -83,4 +97,5 @@ export const api = {
       method: "POST",
       body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     }),
+  getBlob: (path: string): Promise<Blob> => requestBlob(path),
 };
