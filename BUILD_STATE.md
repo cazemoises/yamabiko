@@ -1,9 +1,45 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
-Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US).
+Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios).
 
 ## Última ação
+**Modelo de scenarios + redesenho do fluxo de exercício + retry de 1 clique** — pedido explícito do
+usuário ("duas mudanças no core loop, sem nenhuma gamificação nova"). Executado em 4 commits atômicos
+(schema → backend → frontend/fluxo de cenário → frontend/retry), cada um com sua verificação própria.
+
+1. **Migration `0013`**: tabela `scenarios` (`id`, `language`, `title_pt`, `context_description_pt`,
+   `order_index`) + `exercises` ganha `scenario_id` (FK nullable, `ON DELETE SET NULL` — apagar um
+   cenário não apaga os exercícios, só os solta de novo) e `order_in_scenario` (nullable). Retrocompatível
+   de propósito: todo exercício existente continua sem cenário nenhum, funcionando exatamente como antes.
+2. **Backend** — novo pacote `core-api/internal/scenarios` (mesmo padrão de `exercises`): `GET /scenarios?
+   language=` lista cenários; `GET /scenarios/{id}` devolve o cenário com os exercícios já embutidos e
+   ordenados por `order_in_scenario` (evita N+1 requisições do frontend pra montar a sequência + barra de
+   progresso). `exercises.Filter` ganha `ScenarioID` (com `ORDER BY order_in_scenario` quando presente, em
+   vez de `sprint_day_ref`/`category`); `Exercise` expõe `scenario_id`/`order_in_scenario` via
+   `omitempty` — confirmado ao vivo que exercícios soltos continuam sem esses campos na resposta JSON, não
+   só no schema. Sem testes Go novos (pacote `exercises` nunca teve nenhum — segue o padrão já
+   estabelecido do repo de verificar via curl contra Postgres real em vez de mocks).
+3. **Frontend — fluxo de cenário**: `ExercisePage` busca o cenário só quando `exercise.scenario_id` muda
+   (não a cada exercício dentro do mesmo cenário — reaproveita o que já carregou), mostra
+   `context_description_pt` no topo + barra "X de N", e troca o botão principal pra "Próximo →" ao
+   acertar (PASS) — navegação client-side (react-router) pro próximo exercício do cenário, sem passar pela
+   lista. `<AudioRecorder key={exercise.id}>` reresolve o reset de estado ao trocar de exercício sem
+   plumbing extra. Último exercício do cenário mostra "🎉 Cenário concluído!" em vez de "Próximo".
+4. **Frontend — retry de 1 clique**: auditoria do fluxo de erro encontrou **2 cliques** entre ver o
+   veredito FAIL/PARTIAL e voltar a gravar ("Gravar de novo" limpava a prévia e voltava pro estado idle,
+   exigindo um 2º clique em "🎙 Gravar"). `useAudioRecorder.retry()` encadeia limpar a prévia + `start()`
+   num só passo; o botão (renomeado "Tentar de novo") agora dispara isso — **1 clique**, sem re-navegação,
+   sem re-fetch do exercício, sem re-pedir permissão de microfone (o browser já lembra a concessão da 1ª
+   gravação da sessão, `getUserMedia()` não reabre prompt nenhum).
+5. **e2e**: `scenario-flow.spec.ts` percorre um cenário de 2 exercícios ponta a ponta (contexto/progresso
+   corretos, navegação via "Próximo" sem lista, estado de conclusão). `retry-flow.spec.ts` mede o trecho
+   erro→retry como exatamente 1 clique, confirma URL e fetch do exercício inalterados, e fecha o ciclo com
+   uma 2ª tentativa que acerta.
+6. `go build`/`go vet`/`go test ./...` (core-api) e `tsc -b && vite build`/`oxlint`/`playwright test`
+   (web, 10/10 specs e2e) passando em cada um dos 4 commits.
+
+## Última ação (Piper TTS + generalização tts/ — histórico)
 **Piper TTS pra en-US + generalização do módulo `tts/` (TTSClient)** — pedido de follow-up do usuário,
 enviado no meio da sessão da troca de speaker do VOICEVOX (ver histórico abaixo) e tratado como um pedido
 à parte, maior. Executado em 4 commits atômicos (docker-compose → interface TTSClient + PiperClient →
