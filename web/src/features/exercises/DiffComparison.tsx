@@ -9,7 +9,7 @@ interface DiffComparisonProps {
   actual: string;
   diff: DiffEntry[];
   language?: string;
-  exerciseId?: string;
+  exerciseId: string;
 }
 
 // Romaji só faz sentido como apoio de leitura pra kana — em inglês seria só
@@ -31,7 +31,7 @@ export function DiffComparison({ expected, actual, diff, language = "ja-JP", exe
             <DiffChar key={col.position} char={col.expectedChar} mismatch={col.entry !== null} showRomaji={showRomaji} />
           ))}
         </div>
-        <SpeakButton text={expected} lang={language} exerciseId={exerciseId} className="speak-button-inline" />
+        <SpeakButton exerciseId={exerciseId} className="speak-button-inline" />
       </div>
       <div className="diff-row" data-testid="diff-row-actual">
         <span className="diff-row-label">Você disse</span>

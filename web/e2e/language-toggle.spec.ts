@@ -46,7 +46,7 @@ test("toggle JA/EN filtra a lista por idioma e reflete no botão de pronúncia e
   await expect(page.getByText(JA_EXERCISE.prompt_pt)).not.toBeVisible();
 });
 
-test("exercício em inglês usa lang=en-US no botão de pronúncia e não duplica romaji no diff", async ({ page }) => {
+test("exercício em inglês mostra o botão de pronúncia por áudio real e não duplica romaji no diff", async ({ page }) => {
   await page.route(`${API_BASE_URL}/exercises/${EN_EXERCISE.id}`, async (route) => {
     await route.fulfill({ status: 200, json: EN_EXERCISE });
   });

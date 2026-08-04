@@ -1,15 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { API_BASE_URL, seedTokensOnce } from "./helpers";
-
-const JA_EXERCISE = {
-  id: "ex-ja-ref-audio",
-  category: "saudacao",
-  difficulty: 1,
-  prompt_pt: "Cumprimente alguém de manhã",
-  expected_transcript: "おはよう",
-  sprint_day_ref: 1,
-  language: "ja-JP",
-};
 
 // WAV mínimo (mono, 8-bit PCM, 8kHz) com silêncio — precisa ser um arquivo de
 // verdade (não bytes arbitrários) pra <audio>.play() não rejeitar por erro de
@@ -34,24 +24,35 @@ function silentWav(sampleCount = 400): Buffer {
   return buffer;
 }
 
-test("exercício ja-JP toca o áudio de referência real do VOICEVOX via <audio>, testável em headless", async ({
-  page,
-}) => {
+interface Exercise {
+  id: string;
+  category: string;
+  difficulty: number;
+  prompt_pt: string;
+  expected_transcript: string;
+  sprint_day_ref: number;
+  language: string;
+}
+
+// Fluxo idêntico pros dois idiomas desde a generalização do endpoint
+// (VOICEVOX pra ja-JP, Piper pra en-US, mas o frontend não sabe nem precisa
+// saber qual dos dois está por trás) — daí o mesmo teste rodando 2x.
+async function assertReferenceAudioPlaysViaAudioElement(page: Page, exercise: Exercise): Promise<void> {
   let referenceAudioCalls = 0;
 
-  await page.route(`${API_BASE_URL}/exercises/${JA_EXERCISE.id}`, async (route) => {
-    await route.fulfill({ status: 200, json: JA_EXERCISE });
+  await page.route(`${API_BASE_URL}/exercises/${exercise.id}`, async (route) => {
+    await route.fulfill({ status: 200, json: exercise });
   });
 
-  await page.route(`${API_BASE_URL}/exercises/${JA_EXERCISE.id}/reference-audio`, async (route) => {
+  await page.route(`${API_BASE_URL}/exercises/${exercise.id}/reference-audio`, async (route) => {
     referenceAudioCalls++;
     await route.fulfill({ status: 200, body: silentWav(), headers: { "Content-Type": "audio/wav" } });
   });
 
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
-  await page.goto(`/exercises/${JA_EXERCISE.id}`);
-  await expect(page.getByText(JA_EXERCISE.prompt_pt)).toBeVisible();
+  await page.goto(`/exercises/${exercise.id}`);
+  await expect(page.getByText(exercise.prompt_pt)).toBeVisible();
 
   const speakButton = page.getByRole("button", { name: /Ouvir pronúncia esperada/ });
   await expect(speakButton).toBeEnabled();
@@ -65,28 +66,33 @@ test("exercício ja-JP toca o áudio de referência real do VOICEVOX via <audio>
   // Diferente da Web Speech API (não roda em Chromium headless, BUILD_STATE.md),
   // este é um <audio> real com um WAV real — dá pra confirmar que play() não
   // ficou pausado/rejeitado, sem depender de vozes instaladas no SO.
-  await expect
-    .poll(() => audioEl.evaluate((el: HTMLAudioElement) => el.paused))
-    .toBe(false);
+  await expect.poll(() => audioEl.evaluate((el: HTMLAudioElement) => el.paused)).toBe(false);
+}
+
+test("exercício ja-JP toca o áudio de referência real (VOICEVOX) via <audio>, testável em headless", async ({
+  page,
+}) => {
+  await assertReferenceAudioPlaysViaAudioElement(page, {
+    id: "ex-ja-ref-audio",
+    category: "saudacao",
+    difficulty: 1,
+    prompt_pt: "Cumprimente alguém de manhã",
+    expected_transcript: "おはよう",
+    sprint_day_ref: 1,
+    language: "ja-JP",
+  });
 });
 
-test("exercício en-US não chama reference-audio — continua usando Web Speech API", async ({ page }) => {
-  const enExercise = { ...JA_EXERCISE, id: "ex-en-ref-audio", language: "en-US", expected_transcript: "hi" };
-  let referenceAudioCalls = 0;
-
-  await page.route(`${API_BASE_URL}/exercises/${enExercise.id}`, async (route) => {
-    await route.fulfill({ status: 200, json: enExercise });
+test("exercício en-US toca o áudio de referência real (Piper) via <audio>, testável em headless", async ({
+  page,
+}) => {
+  await assertReferenceAudioPlaysViaAudioElement(page, {
+    id: "ex-en-ref-audio",
+    category: "saudacoes",
+    difficulty: 1,
+    prompt_pt: "Cumprimente alguém casualmente",
+    expected_transcript: "hi, how are you?",
+    sprint_day_ref: 1,
+    language: "en-US",
   });
-  await page.route(`${API_BASE_URL}/exercises/${enExercise.id}/reference-audio`, async (route) => {
-    referenceAudioCalls++;
-    await route.fulfill({ status: 404, json: { error: "não deveria ser chamado" } });
-  });
-
-  await seedTokensOnce(page, "valid-token", "valid-refresh-token");
-
-  await page.goto(`/exercises/${enExercise.id}`);
-  await expect(page.getByText(enExercise.prompt_pt)).toBeVisible();
-
-  await expect(page.getByTestId("reference-audio")).toHaveCount(0);
-  expect(referenceAudioCalls).toBe(0);
 });
