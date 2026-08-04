@@ -3,6 +3,29 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Indicador de volume em tempo real durante a gravação** (item 3/3, último do pedido do usuário nesta
+sessão — os 3 itens estão concluídos e commitados individualmente).
+
+- `web/src/components/audio/useAudioRecorder.ts`: ao iniciar a gravação, além do `MediaRecorder` já
+  existente, abre um `AudioContext` + `AnalyserNode` (`fftSize: 256`) sobre o **mesmo** `MediaStream`
+  (não pede um segundo acesso ao microfone). Um loop de `requestAnimationFrame` lê
+  `getByteTimeDomainData`, calcula RMS do sinal normalizado e expõe `volume` (0-1, com pequeno ganho
+  `*4` pra ficar visualmente perceptível com fala normal) como novo campo do hook. `AudioContext` fecha e
+  o loop cancela tanto no `stop()` quanto no unmount (cleanup do `useEffect`) — sem vazar contexto de
+  áudio entre re-gravações.
+- `web/src/components/audio/AudioRecorder.tsx`: enquanto `status === "recording"`, mostra uma barra
+  (`role="progressbar"`, `aria-valuenow`) cuja largura reflete `volume` em tempo real, ao lado do botão
+  "Parar gravação". Some assim que a gravação para (o usuário já tem o preview de áudio pra conferir
+  volume/ruído depois disso).
+- TDD literal: `web/e2e/volume-meter.spec.ts` escrito primeiro, RED confirmado (`volume-meter` não
+  existia). Reaproveita o Chromium em modo `--use-fake-device-for-media-stream` (já configurado pro item
+  2) — o dispositivo de áudio fake do Chromium gera um tom sintético, não silêncio, então o teste
+  faz `expect.poll` no atributo `data-volume` do medidor até ele reportar > 0, provando que a leitura é
+  de verdade em tempo real (não um valor estático). 4/4 specs e2e passando, rodado 3x seguidas sem
+  flake.
+- `tsc -b && vite build` e `oxlint` limpos.
+
+## Última ação (pós-Fase 6, UX do diff — histórico)
 **UX do resultado do desafio redesenhada** (item 2/3 do pedido do usuário nesta sessão): antes, uma
 divergência aparecia como `SUBSTITUTE — esperado "わ", transcrito "お" (OUTRO)` — ilegível pra quem não lê
 kana fluente e expõe rótulo técnico cru pro aluno.
@@ -259,21 +282,14 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
     do CLAUDE.md), não esquecimento.
 
 ## Próximo passo imediato
-Pedido explícito do usuário nesta sessão, três itens em ordem de prioridade (item 1 é bug de lógica de
-negócio, tratado com TDD; itens 2 e 3 são UX):
-1. **[CONCLUÍDO]** Bug no classificador de `phonetic_diff` — corrigido (`classifySubstitute` agora
-   reconhece confusão entre vogais puras como `VOGAL_ENGOLIDA`, não só pares ら/た-row). Ver "Última
-   ação" acima.
-2. **[CONCLUÍDO]** UX do resultado do desafio redesenhada (highlight lado a lado + romaji + explicação em
-   português). Ver "Última ação" acima.
-3. **[PRÓXIMO]** Indicador de volume em tempo real durante a gravação (`AnalyserNode` da Web Audio API
-   sobre o stream do `MediaRecorder` já existente em `components/audio/`).
+Os 3 itens pedidos explicitamente pelo usuário nesta sessão estão **todos concluídos e commitados
+individualmente**: (1) bug do classificador `phonetic_diff` corrigido, (2) UX do resultado do desafio
+redesenhada, (3) indicador de volume em tempo real. Ver "Última ação" (topo) e os históricos logo abaixo
+pra detalhe de cada um.
 
-Commit separado por item, `BUILD_STATE.md` atualizado ao final de cada um.
-
-Se reabrir uma sessão sem instrução nova do usuário e os 3 itens acima já estiverem commitados: (a)
-rodar a suite completa (`go test ./...` em `core-api`, `npm run build && npm run test:e2e` em `web`) pra
-confirmar que nada quebrou; (b) atacar o item 1 do débito técnico abaixo (transação nos efeitos
+Sem instrução nova do usuário, ao reabrir uma sessão: (a) rodar a suite completa (`go test ./...` em
+`core-api`, `npm run build && npm run test:e2e` em `web`) pra confirmar que nada quebrou; (b) atacar o
+item 1 do débito técnico abaixo (transação nos efeitos
 colaterais de `attempts.Submit`) ou o item 2 (Redis + revogação de refresh token); (c) considerar trocar
 o N+1 do dashboard (item 7) pelos endpoints agregados que já existem no backend.
 
