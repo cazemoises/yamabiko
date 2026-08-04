@@ -7,7 +7,7 @@ interface AudioRecorderProps {
 }
 
 export function AudioRecorder({ onRecorded, disabled }: AudioRecorderProps) {
-  const { status, audioBlob, error, volume, start, stop, reset } = useAudioRecorder();
+  const { status, audioBlob, error, volume, start, stop, retry } = useAudioRecorder();
 
   const previewUrl = useMemo(() => (audioBlob ? URL.createObjectURL(audioBlob) : null), [audioBlob]);
 
@@ -19,8 +19,10 @@ export function AudioRecorder({ onRecorded, disabled }: AudioRecorderProps) {
           <button type="button" onClick={() => onRecorded(audioBlob)} disabled={disabled}>
             Enviar
           </button>
-          <button type="button" onClick={reset} disabled={disabled}>
-            Gravar de novo
+          {/* 1 clique só: limpa a prévia e já começa a gravar de novo (retry),
+              em vez de exigir um 2º clique em "🎙 Gravar" depois de descartar. */}
+          <button type="button" onClick={() => void retry()} disabled={disabled}>
+            Tentar de novo
           </button>
         </div>
       </div>

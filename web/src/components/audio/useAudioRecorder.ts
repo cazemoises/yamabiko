@@ -9,7 +9,7 @@ interface AudioRecorderState {
   volume: number;
   start: () => Promise<void>;
   stop: () => void;
-  reset: () => void;
+  retry: () => Promise<void>;
 }
 
 export function useAudioRecorder(): AudioRecorderState {
@@ -92,12 +92,17 @@ export function useAudioRecorder(): AudioRecorderState {
     stopVolumeMeter();
   }, [stopVolumeMeter]);
 
-  const reset = useCallback((): void => {
+  // retry existe pra reduzir "errei -> gravando de novo" a 1 clique só: limpa
+  // a prévia da tentativa anterior e já chama start() na sequência, em vez de
+  // exigir um clique pra descartar (reset) e outro pra começar a gravar de
+  // novo. getUserMedia() dentro de start() não reabre o prompt de permissão —
+  // o browser já lembra a concessão feita na 1ª gravação desta sessão.
+  const retry = useCallback(async (): Promise<void> => {
     setAudioBlob(null);
-    setStatus("idle");
-  }, []);
+    await start();
+  }, [start]);
 
   useEffect(() => stopVolumeMeter, [stopVolumeMeter]);
 
-  return { status, audioBlob, error, volume, start, stop, reset };
+  return { status, audioBlob, error, volume, start, stop, retry };
 }
