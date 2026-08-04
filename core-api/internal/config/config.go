@@ -15,6 +15,9 @@ type Config struct {
 	RefreshTokenTTL    time.Duration
 	STTServiceURL      string
 	CORSAllowedOrigins []string
+	VoicevoxURL        string
+	VoicevoxSpeakerID  string
+	AudioCacheDir      string
 }
 
 func Load() (*Config, error) {
@@ -33,9 +36,24 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("STT_SERVICE_URL não configurado")
 	}
 
+	voicevoxURL := os.Getenv("VOICEVOX_URL")
+	if voicevoxURL == "" {
+		return nil, fmt.Errorf("VOICEVOX_URL não configurado")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+
+	voicevoxSpeakerID := os.Getenv("VOICEVOX_SPEAKER_ID")
+	if voicevoxSpeakerID == "" {
+		voicevoxSpeakerID = "1" // speaker default do VOICEVOX (Zundamon, normal) — sem preferência específica do produto
+	}
+
+	audioCacheDir := os.Getenv("AUDIO_CACHE_DIR")
+	if audioCacheDir == "" {
+		audioCacheDir = "audio-cache"
 	}
 
 	return &Config{
@@ -46,6 +64,9 @@ func Load() (*Config, error) {
 		RefreshTokenTTL:    7 * 24 * time.Hour,
 		STTServiceURL:      sttServiceURL,
 		CORSAllowedOrigins: corsAllowedOrigins(),
+		VoicevoxURL:        voicevoxURL,
+		VoicevoxSpeakerID:  voicevoxSpeakerID,
+		AudioCacheDir:      audioCacheDir,
 	}, nil
 }
 
