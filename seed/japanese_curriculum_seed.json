@@ -1,0 +1,71 @@
+{
+  "language": "ja-JP",
+  "target_speaker_l1": "pt-BR",
+  "note_dedupe": "Alguns dos exercícios de saudação/apresentação podem colidir com os 10 já seedados na Fase 3. Antes de importar, verifique duplicatas por expected_transcript e pule as que já existem.",
+  "exercises": [
+    {"category": "saudacoes_apresentacao", "difficulty": 1, "sprint_day_ref": 1, "prompt_pt": "Cumprimente formalmente dizendo bom dia.", "expected_transcript": "おはようございます", "expected_romaji": "ohayou gozaimasu"},
+    {"category": "saudacoes_apresentacao", "difficulty": 1, "sprint_day_ref": 1, "prompt_pt": "Cumprimente dizendo boa tarde / olá.", "expected_transcript": "こんにちは", "expected_romaji": "konnichiwa"},
+    {"category": "saudacoes_apresentacao", "difficulty": 2, "sprint_day_ref": 2, "prompt_pt": "Se apresente formalmente dizendo seu nome, num contexto de trabalho.", "expected_transcript": "はじめまして、モイゼスともうします", "expected_romaji": "hajimemashite, Moisés to moushimasu"},
+    {"category": "saudacoes_apresentacao", "difficulty": 2, "sprint_day_ref": 3, "prompt_pt": "Peça pra a pessoa cuidar bem de você (fórmula de fechamento de apresentação).", "expected_transcript": "どうぞよろしくおねがいします", "expected_romaji": "douzo yoroshiku onegaishimasu"},
+
+    {"category": "compras_konbini", "difficulty": 1, "sprint_day_ref": 6, "prompt_pt": "Diga que não precisa do saco plástico.", "expected_transcript": "ふくろはいりません", "expected_romaji": "fukuro wa irimasen"},
+    {"category": "compras_konbini", "difficulty": 1, "sprint_day_ref": 6, "prompt_pt": "Peça um item apontando: 'isso, por favor'.", "expected_transcript": "これをください", "expected_romaji": "kore wo kudasai"},
+    {"category": "compras_konbini", "difficulty": 2, "sprint_day_ref": 7, "prompt_pt": "Pergunte se aceitam cartão de crédito.", "expected_transcript": "クレジットカードはつかえますか", "expected_romaji": "kurejitto kaado wa tsukaemasu ka"},
+    {"category": "compras_konbini", "difficulty": 2, "sprint_day_ref": 8, "prompt_pt": "Peça o recibo.", "expected_transcript": "レシートをください", "expected_romaji": "reshiito wo kudasai"},
+    {"category": "compras_konbini", "difficulty": 3, "sprint_day_ref": 9, "prompt_pt": "Pergunte se tem algo um pouco mais barato.", "expected_transcript": "もうすこしやすいのはありますか", "expected_romaji": "mou sukoshi yasui no wa arimasu ka"},
+    {"category": "compras_konbini", "difficulty": 2, "sprint_day_ref": 10, "prompt_pt": "Pergunte onde fica um item na loja.", "expected_transcript": "どこにありますか", "expected_romaji": "doko ni arimasu ka"},
+
+    {"category": "restaurante", "difficulty": 1, "sprint_day_ref": 11, "prompt_pt": "Peça pra ver o cardápio.", "expected_transcript": "メニューをみせてください", "expected_romaji": "menyuu wo misete kudasai"},
+    {"category": "restaurante", "difficulty": 2, "sprint_day_ref": 12, "prompt_pt": "Pergunte o que o garçom recomenda.", "expected_transcript": "おすすめはなんですか", "expected_romaji": "osusume wa nan desu ka"},
+    {"category": "restaurante", "difficulty": 1, "sprint_day_ref": 12, "prompt_pt": "Faça o pedido apontando pro item: 'isso, por favor'.", "expected_transcript": "これをおねがいします", "expected_romaji": "kore wo onegaishimasu"},
+    {"category": "restaurante", "difficulty": 2, "sprint_day_ref": 13, "prompt_pt": "Peça a conta.", "expected_transcript": "おかいけいおねがいします", "expected_romaji": "okaikei onegaishimasu"},
+    {"category": "restaurante", "difficulty": 1, "sprint_day_ref": 14, "prompt_pt": "Peça um copo d'água.", "expected_transcript": "おみずをください", "expected_romaji": "omizu wo kudasai"},
+    {"category": "restaurante", "difficulty": 2, "sprint_day_ref": 15, "prompt_pt": "Diga que estava muito gostoso, ao terminar a refeição.", "expected_transcript": "とてもおいしかったです", "expected_romaji": "totemo oishikatta desu"},
+
+    {"category": "direcoes_transporte", "difficulty": 2, "sprint_day_ref": 16, "prompt_pt": "Pergunte onde fica a estação.", "expected_transcript": "えきはどこですか", "expected_romaji": "eki wa doko desu ka"},
+    {"category": "direcoes_transporte", "difficulty": 1, "sprint_day_ref": 16, "prompt_pt": "Pergunte se é perto daqui.", "expected_transcript": "ちかいですか", "expected_romaji": "chikai desu ka"},
+    {"category": "direcoes_transporte", "difficulty": 3, "sprint_day_ref": 17, "prompt_pt": "Pergunte quanto tempo demora a pé.", "expected_transcript": "あるいてどのくらいですか", "expected_romaji": "aruite dono kurai desu ka"},
+    {"category": "direcoes_transporte", "difficulty": 2, "sprint_day_ref": 18, "prompt_pt": "Peça pra chamarem um táxi.", "expected_transcript": "タクシーをよんでください", "expected_romaji": "takushii wo yonde kudasai"},
+    {"category": "direcoes_transporte", "difficulty": 3, "sprint_day_ref": 19, "prompt_pt": "Pergunte se esse trem vai pra Tóquio.", "expected_transcript": "このでんしゃはとうきょうにいきますか", "expected_romaji": "kono densha wa toukyou ni ikimasu ka"},
+    {"category": "direcoes_transporte", "difficulty": 2, "sprint_day_ref": 20, "prompt_pt": "Diga que está perdido.", "expected_transcript": "みちにまよいました", "expected_romaji": "michi ni mayoimashita"},
+
+    {"category": "emergencia_saude", "difficulty": 2, "sprint_day_ref": 21, "prompt_pt": "Peça ajuda numa emergência.", "expected_transcript": "たすけてください", "expected_romaji": "tasukete kudasai"},
+    {"category": "emergencia_saude", "difficulty": 2, "sprint_day_ref": 22, "prompt_pt": "Pergunte onde fica o hospital.", "expected_transcript": "びょういんはどこですか", "expected_romaji": "byouin wa doko desu ka"},
+    {"category": "emergencia_saude", "difficulty": 2, "sprint_day_ref": 22, "prompt_pt": "Diga que não está se sentindo bem.", "expected_transcript": "きぶんがわるいです", "expected_romaji": "kibun ga warui desu"},
+    {"category": "emergencia_saude", "difficulty": 3, "sprint_day_ref": 23, "prompt_pt": "Peça pra chamarem a polícia.", "expected_transcript": "けいさつをよんでください", "expected_romaji": "keisatsu wo yonde kudasai"},
+    {"category": "emergencia_saude", "difficulty": 3, "sprint_day_ref": 24, "prompt_pt": "Diga que perdeu o passaporte.", "expected_transcript": "パスポートをなくしました", "expected_romaji": "pasupooto wo nakushimashita"},
+    {"category": "emergencia_saude", "difficulty": 2, "sprint_day_ref": 25, "prompt_pt": "Pergunte se tem algum remédio disponível.", "expected_transcript": "くすりはありますか", "expected_romaji": "kusuri wa arimasu ka"},
+
+    {"category": "trabalho_escritorio", "difficulty": 2, "sprint_day_ref": 26, "prompt_pt": "Peça desculpas pelo atraso.", "expected_transcript": "おそくなってすみません", "expected_romaji": "osoku natte sumimasen"},
+    {"category": "trabalho_escritorio", "difficulty": 2, "sprint_day_ref": 27, "prompt_pt": "Peça pra repetirem mais uma vez.", "expected_transcript": "もういちどおねがいします", "expected_romaji": "mou ichido onegaishimasu"},
+    {"category": "trabalho_escritorio", "difficulty": 3, "sprint_day_ref": 28, "prompt_pt": "Pergunte a que horas começa a reunião.", "expected_transcript": "かいぎはなんじからですか", "expected_romaji": "kaigi wa nanji kara desu ka"},
+    {"category": "trabalho_escritorio", "difficulty": 2, "sprint_day_ref": 29, "prompt_pt": "Peça pra pessoa aguardar um momento.", "expected_transcript": "しょうしょうおまちください", "expected_romaji": "shoushou omachi kudasai"},
+    {"category": "trabalho_escritorio", "difficulty": 3, "sprint_day_ref": 30, "prompt_pt": "Diga que vai tirar folga hoje.", "expected_transcript": "きょうはやすみをとります", "expected_romaji": "kyou wa yasumi wo torimasu"},
+
+    {"category": "numeros_horarios", "difficulty": 1, "sprint_day_ref": 31, "prompt_pt": "Pergunte que horas são agora.", "expected_transcript": "いまなんじですか", "expected_romaji": "ima nanji desu ka"},
+    {"category": "numeros_horarios", "difficulty": 3, "sprint_day_ref": 32, "prompt_pt": "Combine de se encontrar às 9 da manhã.", "expected_transcript": "ごぜんくじにあいましょう", "expected_romaji": "gozen kuji ni aimashou"},
+    {"category": "numeros_horarios", "difficulty": 1, "sprint_day_ref": 33, "prompt_pt": "Peça uma unidade de um item.", "expected_transcript": "ひとつください", "expected_romaji": "hitotsu kudasai"},
+    {"category": "numeros_horarios", "difficulty": 2, "sprint_day_ref": 34, "prompt_pt": "Pergunte quanto é no total.", "expected_transcript": "ぜんぶでいくらですか", "expected_romaji": "zenbu de ikura desu ka"},
+    {"category": "numeros_horarios", "difficulty": 3, "sprint_day_ref": 35, "prompt_pt": "Pergunte que dia da semana é amanhã.", "expected_transcript": "あしたはなんようびですか", "expected_romaji": "ashita wa nan youbi desu ka"},
+
+    {"category": "telefone_agendamento", "difficulty": 1, "sprint_day_ref": 36, "prompt_pt": "Atenda o telefone.", "expected_transcript": "もしもし", "expected_romaji": "moshi moshi"},
+    {"category": "telefone_agendamento", "difficulty": 3, "sprint_day_ref": 37, "prompt_pt": "Peça o número de telefone da pessoa.", "expected_transcript": "でんわばんごうをおしえてください", "expected_romaji": "denwa bangou wo oshiete kudasai"},
+    {"category": "telefone_agendamento", "difficulty": 2, "sprint_day_ref": 37, "prompt_pt": "Diga que vai ligar de volta depois.", "expected_transcript": "あとでかけなおします", "expected_romaji": "ato de kakenaoshimasu"},
+    {"category": "telefone_agendamento", "difficulty": 2, "sprint_day_ref": 38, "prompt_pt": "Diga que quer fazer uma reserva.", "expected_transcript": "よやくをしたいです", "expected_romaji": "yoyaku wo shitai desu"},
+    {"category": "telefone_agendamento", "difficulty": 2, "sprint_day_ref": 39, "prompt_pt": "Peça pra cancelar algo.", "expected_transcript": "キャンセルしてください", "expected_romaji": "kyanseru shite kudasai"},
+    {"category": "telefone_agendamento", "difficulty": 3, "sprint_day_ref": 40, "prompt_pt": "Pergunte se dá pra mudar o horário combinado.", "expected_transcript": "スケジュールをへんこうできますか", "expected_romaji": "sukejuuru wo henkou dekimasu ka"},
+
+    {"category": "moradia_cotidiano", "difficulty": 2, "sprint_day_ref": 41, "prompt_pt": "Diga que a luz não acende.", "expected_transcript": "でんきがつきません", "expected_romaji": "denki ga tsukimasen"},
+    {"category": "moradia_cotidiano", "difficulty": 3, "sprint_day_ref": 42, "prompt_pt": "Diga que a internet não conecta.", "expected_transcript": "インターネットがつながりません", "expected_romaji": "intaanetto ga tsunagarimasen"},
+    {"category": "moradia_cotidiano", "difficulty": 2, "sprint_day_ref": 43, "prompt_pt": "Pergunte quanto é o aluguel.", "expected_transcript": "やちんはいくらですか", "expected_romaji": "yachin wa ikura desu ka"},
+    {"category": "moradia_cotidiano", "difficulty": 2, "sprint_day_ref": 44, "prompt_pt": "Pergunte onde joga o lixo.", "expected_transcript": "ゴミはどこにすてますか", "expected_romaji": "gomi wa doko ni sutemasu ka"},
+    {"category": "moradia_cotidiano", "difficulty": 3, "sprint_day_ref": 45, "prompt_pt": "Diga que quer usar a máquina de lavar.", "expected_transcript": "せんたくきをつかいたいです", "expected_romaji": "sentakuki wo tsukaitai desu"},
+
+    {"category": "conversa_social", "difficulty": 2, "sprint_day_ref": 46, "prompt_pt": "Pergunte qual é o hobby da pessoa.", "expected_transcript": "しゅみはなんですか", "expected_romaji": "shumi wa nan desu ka"},
+    {"category": "conversa_social", "difficulty": 2, "sprint_day_ref": 47, "prompt_pt": "Pergunte se a pessoa gosta do Japão.", "expected_transcript": "にほんはすきですか", "expected_romaji": "nihon wa suki desu ka"},
+    {"category": "conversa_social", "difficulty": 1, "sprint_day_ref": 48, "prompt_pt": "Comente casualmente que hoje está quente.", "expected_transcript": "きょうはあついですね", "expected_romaji": "kyou wa atsui desu ne"},
+    {"category": "conversa_social", "difficulty": 2, "sprint_day_ref": 49, "prompt_pt": "Pergunte o que a pessoa faz no fim de semana.", "expected_transcript": "しゅうまつはなにをしますか", "expected_romaji": "shuumatsu wa nani wo shimasu ka"},
+    {"category": "conversa_social", "difficulty": 2, "sprint_day_ref": 50, "prompt_pt": "Se despeça combinando de se ver de novo amanhã.", "expected_transcript": "またあしたあいましょう", "expected_romaji": "mata ashita aimashou"},
+    {"category": "conversa_social", "difficulty": 1, "sprint_day_ref": 50, "prompt_pt": "Se despeça desejando que a pessoa se cuide.", "expected_transcript": "おげんきで", "expected_romaji": "o genki de"}
+  ]
+}

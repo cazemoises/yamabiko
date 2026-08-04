@@ -10,4 +10,5 @@ type Exercise struct {
 	ExpectedTranscript string    `json:"expected_transcript"`
 	ExpectedRomaji     string    `json:"expected_romaji,omitempty"`
 	SprintDayRef       int       `json:"sprint_day_ref"`
+	Language           string    `json:"language"`
 }

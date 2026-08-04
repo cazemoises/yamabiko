@@ -8,6 +8,7 @@ export interface Exercise {
   expected_transcript: string;
   expected_romaji?: string;
   sprint_day_ref: number;
+  language: string;
 }
 
 export interface DiffEntry {

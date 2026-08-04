@@ -3,6 +3,37 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Importação do seed curricular ampliado (54 novos exercícios `ja-JP`)** — pedido do usuário pra importar
+`japanese_curriculum_seed_giant.json`.
+
+- **Achado antes de agir**: `japanese_curriculum_seed_giant.json` não existe em lugar nenhum (raiz, `seed/`,
+  nem em `Downloads`/`Desktop` do usuário — busquei explicitamente). O que existe é `seed/
+  japanese_curriculum_seed.json` (55 exercícios), cujo próprio campo `note_dedupe` já descreve a mesma
+  regra de dedupe pedida. Perguntei ao usuário em vez de adivinhar ou inventar conteúdo curricular por
+  conta própria — confirmado: importar esse arquivo menor.
+- **Dedupe verificado programaticamente** (script Python descartável, não commitado) comparando
+  `expected_transcript` do JSON contra os 10 exercícios já seedados pela migration `0004`: 55 no arquivo,
+  todos únicos entre si, **1 colisão real** (`こんにちは`, já existia) — pulado, não reinserido.
+- **Migration `0009_add_language_to_exercises`**: a tabela `exercises` não tinha coluna `language`
+  (schema original da Sec. 2 do CLAUDE.md não previa — produto sempre foi ja-JP-only implicitamente).
+  Adicionada `language TEXT NOT NULL DEFAULT 'ja-JP'` — decisão tratada como aditiva/de baixo risco, não
+  como "trocar idioma-alvo" (a exceção de pausa da Sec. 0): não há suporte de verdade a múltiplos idiomas
+  ainda, é só rotulagem explícita batendo com o que o usuário pediu (`language='ja-JP'`). Model Go
+  (`exercises.Exercise`) e as duas queries do `PostgresRepository` (`List`/`FindByID`) atualizados pra
+  incluir a coluna; `web/src/features/exercises/api.ts` (`Exercise` interface) também.
+- **Migration `0010_seed_exercises_curriculum_expansion`**: `INSERT` dos 54 exercícios novos (categorias
+  `compras_konbini`, `restaurante`, `direcoes_transporte`, `emergencia_saude`, `trabalho_escritorio`,
+  `numeros_horarios`, `telefone_agendamento`, `moradia_cotidiano`, `conversa_social`, além de mais 3 em
+  `saudacoes_apresentacao`), todos com `language='ja-JP'`, `sprint_day_ref` 1-50. `down.sql` remove só
+  esses 54 (não toca em `こんにちは`, que não foi inserido por esta migration).
+- **Verificação real contra Postgres** (não só leitura estática do SQL): `docker compose up -d --build
+  core-api` reaplicou as migrations (`schema_migrations.version = 10, dirty = false`). Contagem final
+  confirmada via `psql`: **64 exercícios `ja-JP`** no total (10 pré-existentes da Fase 3 + 54 novos),
+  zero `expected_transcript` duplicado (`GROUP BY ... HAVING COUNT(*) > 1` retornou 0 linhas).
+- `go build`/`go vet`/`go test ./...` (core-api) e `npm run build`/`test:e2e` (web) limpos após a mudança
+  de schema/model.
+
+## Última ação (botão de pronúncia — histórico)
 **Botão "Ouvir pronúncia esperada" via Web Speech API** (pedido explícito do usuário).
 
 - `web/src/components/audio/SpeakButton.tsx` (novo componente reutilizável): `window.speechSynthesis` +
