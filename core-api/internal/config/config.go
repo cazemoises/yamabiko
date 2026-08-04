@@ -48,7 +48,12 @@ func Load() (*Config, error) {
 
 	voicevoxSpeakerID := os.Getenv("VOICEVOX_SPEAKER_ID")
 	if voicevoxSpeakerID == "" {
-		voicevoxSpeakerID = "1" // speaker default do VOICEVOX (Zundamon, normal) — sem preferência específica do produto
+		// speaker 30 = "No.7 - アナウンス" (estilo locutor/anúncio) — voz neutra e
+		// adulta, otimizada pra leitura clara de texto, em vez do default puro do
+		// VOICEVOX (speaker 1, ずんだもん/Zundamon, voz de mascote/personagem — não
+		// serve como referência de pronúncia num app de aprendizado). Ver
+		// BUILD_STATE.md pro raciocínio completo da escolha.
+		voicevoxSpeakerID = "30"
 	}
 
 	audioCacheDir := os.Getenv("AUDIO_CACHE_DIR")

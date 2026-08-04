@@ -4,6 +4,29 @@
 Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US).
 
 ## Última ação
+**Troca do speaker padrão do VOICEVOX (mascote -> voz neutra/adulta)** — pedido de follow-up do usuário
+sobre a integração VOICEVOX da sessão anterior.
+
+- **Levantamento**: `GET /speakers` no VOICEVOX (43 personagens, ~127 estilos) confirmou que o default
+  anterior (`speaker=1`) era ずんだもん/Zundamon estilo "ノーマル" — voz de mascote/personagem de anime,
+  inadequada como referência de pronúncia num app de aprendizado sério (Sec. 10 do CLAUDE.md, público é
+  engenheiro adulto). A esmagadora maioria dos ~127 estilos listados são igualmente personagens
+  nomeados/mascotes (四国めたん, 春日部つむぎ, 猫使アル etc.).
+- **Escolha: `speaker=30` ("No.7 - アナウンス")**. `No.7` é a voz "neutra" do próprio VOICEVOX (sem
+  identidade de personagem/mascote, ao contrário dos outros), e o estilo `アナウンス` (locutor/anúncio) é
+  otimizado especificamente pra leitura clara de texto — exatamente o caso de uso de áudio de referência
+  de pronúncia. Verificado contra a instância real rodando (`docker compose exec core-api` ->
+  `/audio_query` + `/synthesis` com `speaker=30`): sintetiza normalmente, WAV válido.
+- **Cache invalidado**: os 2 arquivos que já existiam em `audio-cache/` (gerados com a voz antiga) foram
+  apagados manualmente do volume Docker (`docker compose exec core-api rm -f /app/audio-cache/*.wav`) —
+  não haveria outra forma de invalidá-los, já que a chave de cache é só `exercise_id`, sem versionar a
+  voz. Confirmado que a próxima requisição pro mesmo exercício resintetiza (não serve do cache antigo) e
+  produz um WAV diferente do anterior.
+- `VOICEVOX_SPEAKER_ID` (env var, `docker-compose.yml`) e o default em `config.go` (usado quando a env var
+  não é setada) atualizados de `1` pra `30`, com o raciocínio acima como comentário no código.
+- `go build`/`go vet`/`go test ./...` passando.
+
+## Última ação (integração VOICEVOX — histórico)
 **VOICEVOX como TTS de referência pra ja-JP** — pedido explícito do usuário, resolve de fato o débito
 técnico que estava documentado desde a sessão do botão de pronúncia ("qualidade da pronúncia de
 referência", removido desta doc — ver decisão abaixo). Executado em 4 commits atômicos (docker-compose →
