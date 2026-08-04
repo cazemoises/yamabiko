@@ -20,7 +20,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 }
 
 func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercise, error) {
-	query := `SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language FROM exercises`
+	query := `SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario FROM exercises`
 
 	var conditions []string
 	var args []any
@@ -41,10 +41,20 @@ func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercis
 		args = append(args, *filter.Language)
 		conditions = append(conditions, fmt.Sprintf("language = $%d", len(args)))
 	}
+	if filter.ScenarioID != nil {
+		args = append(args, *filter.ScenarioID)
+		conditions = append(conditions, fmt.Sprintf("scenario_id = $%d", len(args)))
+	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	query += " ORDER BY sprint_day_ref, category"
+	if filter.ScenarioID != nil {
+		// Dentro de um cenário, a ordem narrativa (order_in_scenario) importa mais
+		// que sprint_day_ref — é o que dá a sequência "1 de 4, 2 de 4..." no frontend.
+		query += " ORDER BY order_in_scenario"
+	} else {
+		query += " ORDER BY sprint_day_ref, category"
+	}
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -65,7 +75,7 @@ func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercis
 
 func (r *PostgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Exercise, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language
+		`SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario
 		 FROM exercises WHERE id = $1`,
 		id,
 	)
@@ -86,7 +96,10 @@ type rowScanner interface {
 func scanExercise(row rowScanner) (Exercise, error) {
 	var e Exercise
 	var romaji *string
-	err := row.Scan(&e.ID, &e.Category, &e.Difficulty, &e.PromptPT, &e.ExpectedTranscript, &romaji, &e.SprintDayRef, &e.Language)
+	err := row.Scan(
+		&e.ID, &e.Category, &e.Difficulty, &e.PromptPT, &e.ExpectedTranscript, &romaji, &e.SprintDayRef, &e.Language,
+		&e.ScenarioID, &e.OrderInScenario,
+	)
 	if err != nil {
 		return Exercise{}, err
 	}

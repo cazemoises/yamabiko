@@ -15,6 +15,7 @@ import (
 	"github.com/yamabiko/core-api/internal/exercises"
 	"github.com/yamabiko/core-api/internal/httpserver"
 	"github.com/yamabiko/core-api/internal/phonetics"
+	"github.com/yamabiko/core-api/internal/scenarios"
 	"github.com/yamabiko/core-api/internal/srs"
 	"github.com/yamabiko/core-api/internal/sttclient"
 	"github.com/yamabiko/core-api/internal/tts"
@@ -63,7 +64,10 @@ func main() {
 	ttsService := tts.NewService(ttsClients, exercisesRepo, cfg.AudioCacheDir)
 	ttsHandler := tts.NewHandler(ttsService)
 
-	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, cfg.CORSAllowedOrigins)
+	scenariosRepo := scenarios.NewPostgresRepository(pool)
+	scenariosHandler := scenarios.NewHandler(scenariosRepo, exercisesRepo)
+
+	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins)
 
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {

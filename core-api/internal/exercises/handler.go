@@ -44,6 +44,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("language"); v != "" {
 		filter.Language = &v
 	}
+	if v := q.Get("scenario_id"); v != "" {
+		scenarioID, err := uuid.Parse(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "scenario_id inválido")
+			return
+		}
+		filter.ScenarioID = &scenarioID
+	}
 
 	list, err := h.repo.List(r.Context(), filter)
 	if err != nil {

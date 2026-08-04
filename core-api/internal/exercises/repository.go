@@ -14,6 +14,7 @@ type Filter struct {
 	Category   *string
 	Difficulty *int
 	Language   *string
+	ScenarioID *uuid.UUID
 }
 
 type Repository interface {

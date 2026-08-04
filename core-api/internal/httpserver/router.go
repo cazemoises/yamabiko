@@ -12,6 +12,7 @@ import (
 	"github.com/yamabiko/core-api/internal/dashboard"
 	"github.com/yamabiko/core-api/internal/exercises"
 	appmiddleware "github.com/yamabiko/core-api/internal/middleware"
+	"github.com/yamabiko/core-api/internal/scenarios"
 	"github.com/yamabiko/core-api/internal/tts"
 	"github.com/yamabiko/core-api/internal/users"
 )
@@ -24,6 +25,7 @@ func NewRouter(
 	usersHandler *users.Handler,
 	dashboardHandler *dashboard.Handler,
 	ttsHandler *tts.Handler,
+	scenariosHandler *scenarios.Handler,
 	corsAllowedOrigins []string,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -63,6 +65,11 @@ func NewRouter(
 			r.Post("/{id}/attempts", attemptsHandler.Submit)
 			r.Get("/{id}/attempts", attemptsHandler.History)
 			r.Get("/{id}/reference-audio", ttsHandler.ReferenceAudio)
+		})
+
+		r.Route("/scenarios", func(r chi.Router) {
+			r.Get("/", scenariosHandler.List)
+			r.Get("/{id}", scenariosHandler.Detail)
 		})
 
 		r.Get("/dashboard/heatmap", dashboardHandler.Heatmap)
