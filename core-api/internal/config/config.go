@@ -17,6 +17,8 @@ type Config struct {
 	CORSAllowedOrigins []string
 	VoicevoxURL        string
 	VoicevoxSpeakerID  string
+	PiperAddress       string
+	PiperVoice         string
 	AudioCacheDir      string
 }
 
@@ -41,6 +43,15 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("VOICEVOX_URL não configurado")
 	}
 
+	// PIPER_URL é um endereço TCP (host:port), não uma URL HTTP — o Piper fala
+	// Wyoming (protocolo TCP puro, ver core-api/internal/tts/piper_client.go),
+	// mantido com o nome "_URL" só pra bater com o padrão das outras env vars
+	// de serviço externo (STT_SERVICE_URL, VOICEVOX_URL).
+	piperAddress := os.Getenv("PIPER_URL")
+	if piperAddress == "" {
+		return nil, fmt.Errorf("PIPER_URL não configurado")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -54,6 +65,11 @@ func Load() (*Config, error) {
 		// serve como referência de pronúncia num app de aprendizado). Ver
 		// BUILD_STATE.md pro raciocínio completo da escolha.
 		voicevoxSpeakerID = "30"
+	}
+
+	piperVoice := os.Getenv("PIPER_VOICE")
+	if piperVoice == "" {
+		piperVoice = "en_US-lessac-medium" // voz adulta neutra do catálogo oficial do Piper — ver BUILD_STATE.md
 	}
 
 	audioCacheDir := os.Getenv("AUDIO_CACHE_DIR")
@@ -71,6 +87,8 @@ func Load() (*Config, error) {
 		CORSAllowedOrigins: corsAllowedOrigins(),
 		VoicevoxURL:        voicevoxURL,
 		VoicevoxSpeakerID:  voicevoxSpeakerID,
+		PiperAddress:       piperAddress,
+		PiperVoice:         piperVoice,
 		AudioCacheDir:      audioCacheDir,
 	}, nil
 }

@@ -19,10 +19,10 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-// ReferenceAudio serve GET /exercises/{id}/reference-audio. Só atua pra
-// exercícios ja-JP (o VOICEVOX não fala outros idiomas) — pra en-US devolve
-// 404 com uma mensagem explícita dizendo que o frontend deve usar a Web
-// Speech API em vez deste endpoint.
+// ReferenceAudio serve GET /exercises/{id}/reference-audio. Funciona pra
+// qualquer idioma que tenha um TTSClient registrado no Service (hoje:
+// ja-JP via VOICEVOX, en-US via Piper) — pra qualquer outro devolve 404 com
+// uma mensagem explícita de que não há motor de TTS configurado.
 func (h *Handler) ReferenceAudio(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -36,7 +36,7 @@ func (h *Handler) ReferenceAudio(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "exercício não encontrado")
 		return
 	case errors.Is(err, ErrLanguageNotSupported):
-		writeError(w, http.StatusNotFound, "áudio de referência via VOICEVOX não disponível pra esse idioma — use a Web Speech API no frontend")
+		writeError(w, http.StatusNotFound, "áudio de referência não disponível pra esse idioma")
 		return
 	case err != nil:
 		writeError(w, http.StatusBadGateway, "erro ao gerar áudio de referência: "+err.Error())

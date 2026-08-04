@@ -12,34 +12,33 @@ import (
 	"github.com/yamabiko/core-api/internal/exercises"
 )
 
-// ErrLanguageNotSupported é devolvido quando o exercício não é ja-JP — o
-// VOICEVOX só sintetiza japonês, então pra outros idiomas (ex: en-US) o
-// frontend deve usar a Web Speech API do próprio browser em vez deste
-// endpoint (Sec. pedida pelo usuário).
-//
-// TODO(generalização en-US/Piper): este gate fica hardcoded em ja-JP só
-// nesta etapa (introdução da interface TTSClient) — o próximo commit troca
-// pra seleção por idioma via mapa de TTSClient, momento em que este comentário
-// e o texto do erro deixam de fazer sentido só sobre o VOICEVOX.
-var ErrLanguageNotSupported = errors.New("tts: idioma do exercício não é suportado pelo VOICEVOX")
+// ErrLanguageNotSupported é devolvido quando não há TTSClient registrado pro
+// idioma do exercício — hoje o produto cobre ja-JP (VOICEVOX) e en-US
+// (Piper), então isso só aconteceria pra um idioma futuro sem motor de TTS
+// configurado ainda.
+var ErrLanguageNotSupported = errors.New("tts: nenhum motor de TTS configurado pro idioma desse exercício")
 
 type ExerciseFinder interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*exercises.Exercise, error)
 }
 
-// Service gera (e cacheia em disco) o áudio de referência em japonês de um
-// exercício. O cache existe porque expected_transcript é estático por
-// exercício — não faz sentido chamar o VOICEVOX de novo a cada request pro
-// mesmo exercício (mesmo raciocínio de custo/latência do débito documentado
-// em BUILD_STATE.md sobre a Web Speech API, mas resolvido de fato aqui).
+// Service gera (e cacheia em disco) o áudio de referência de um exercício,
+// escolhendo o TTSClient certo pelo idioma do exercício (chave do mapa:
+// subtag primário do idioma, ex: "ja" de "ja-JP", "en" de "en-US"). O cache
+// existe porque expected_transcript é estático por exercício — não faz
+// sentido chamar o motor de TTS de novo a cada request pro mesmo exercício
+// (mesmo raciocínio de custo/latência do débito documentado em
+// BUILD_STATE.md sobre a Web Speech API, mas resolvido de fato aqui). A
+// chave de cache é só o exercise_id, então funciona pros dois idiomas sem
+// mudança — cada exercício só tem 1 idioma, nunca colide.
 type Service struct {
-	synthesizer    TTSClient
+	clients        map[string]TTSClient
 	exerciseFinder ExerciseFinder
 	cacheDir       string
 }
 
-func NewService(synthesizer TTSClient, exerciseFinder ExerciseFinder, cacheDir string) *Service {
-	return &Service{synthesizer: synthesizer, exerciseFinder: exerciseFinder, cacheDir: cacheDir}
+func NewService(clients map[string]TTSClient, exerciseFinder ExerciseFinder, cacheDir string) *Service {
+	return &Service{clients: clients, exerciseFinder: exerciseFinder, cacheDir: cacheDir}
 }
 
 func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID) ([]byte, error) {
@@ -47,7 +46,9 @@ func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID) (
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(strings.ToLower(exercise.Language), "ja") {
+
+	client, ok := s.clients[primaryLanguageSubtag(exercise.Language)]
+	if !ok {
 		return nil, ErrLanguageNotSupported
 	}
 
@@ -56,7 +57,7 @@ func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID) (
 		return cached, nil
 	}
 
-	audio, err := s.synthesizer.Synthesize(ctx, exercise.ExpectedTranscript)
+	audio, err := client.Synthesize(ctx, exercise.ExpectedTranscript)
 	if err != nil {
 		return nil, err
 	}
@@ -73,4 +74,11 @@ func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID) (
 
 func (s *Service) cachePath(exerciseID uuid.UUID) string {
 	return filepath.Join(s.cacheDir, exerciseID.String()+".wav")
+}
+
+// primaryLanguageSubtag extrai o subtag primário de uma tag BCP-47 (ex: "ja"
+// de "ja-JP", "en" de "en-US") — é a chave usada tanto aqui quanto em
+// comparison.CompareLang pra despachar por idioma sem depender da região.
+func primaryLanguageSubtag(language string) string {
+	return strings.ToLower(strings.SplitN(language, "-", 2)[0])
 }

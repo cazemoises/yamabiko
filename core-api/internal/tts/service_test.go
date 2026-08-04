@@ -12,13 +12,13 @@ import (
 	"github.com/yamabiko/core-api/internal/tts"
 )
 
-type fakeSynthesizer struct {
+type fakeTTSClient struct {
 	calls int
 	audio []byte
 	err   error
 }
 
-func (f *fakeSynthesizer) Synthesize(_ context.Context, _ string) ([]byte, error) {
+func (f *fakeTTSClient) Synthesize(_ context.Context, _ string) ([]byte, error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err
@@ -40,9 +40,9 @@ func (f *fakeExerciseFinder) FindByID(_ context.Context, _ uuid.UUID) (*exercise
 
 func TestGetReferenceAudio_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{audio: []byte("fake-wav-bytes")}
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(synth, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
 
 	exerciseID := uuid.New()
 	audio, err := service.GetReferenceAudio(context.Background(), exerciseID)
@@ -53,7 +53,7 @@ func TestGetReferenceAudio_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 		t.Fatalf("esperava o áudio sintetizado, veio %q", audio)
 	}
 	if synth.calls != 1 {
-		t.Fatalf("esperava 1 chamada ao synthesizer, veio %d", synth.calls)
+		t.Fatalf("esperava 1 chamada ao TTSClient, veio %d", synth.calls)
 	}
 
 	cachedPath := filepath.Join(cacheDir, exerciseID.String()+".wav")
@@ -66,11 +66,11 @@ func TestGetReferenceAudio_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 	}
 }
 
-func TestGetReferenceAudio_CacheHit_DoesNotCallSynthesizerAgain(t *testing.T) {
+func TestGetReferenceAudio_CacheHit_DoesNotCallTTSClientAgain(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{audio: []byte("fake-wav-bytes")}
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(synth, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
 
 	exerciseID := uuid.New()
 
@@ -89,15 +89,15 @@ func TestGetReferenceAudio_CacheHit_DoesNotCallSynthesizerAgain(t *testing.T) {
 		t.Fatalf("esperava o áudio cacheado, veio %q", audio)
 	}
 	if synth.calls != 1 {
-		t.Fatalf("esperava que o VOICEVOX NÃO fosse chamado de novo (servir do cache), veio %d chamadas", synth.calls)
+		t.Fatalf("esperava que o TTSClient NÃO fosse chamado de novo (servir do cache), veio %d chamadas", synth.calls)
 	}
 }
 
-func TestGetReferenceAudio_PreExistingCacheFile_NeverCallsSynthesizer(t *testing.T) {
+func TestGetReferenceAudio_PreExistingCacheFile_NeverCallsTTSClient(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{audio: []byte("nao-deveria-ser-usado")}
+	synth := &fakeTTSClient{audio: []byte("nao-deveria-ser-usado")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(synth, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
 
 	exerciseID := uuid.New()
 	preExisting := []byte("audio-ja-cacheado-antes")
@@ -113,30 +113,58 @@ func TestGetReferenceAudio_PreExistingCacheFile_NeverCallsSynthesizer(t *testing
 		t.Fatalf("esperava servir o arquivo pré-existente, veio %q", audio)
 	}
 	if synth.calls != 0 {
-		t.Fatalf("esperava 0 chamadas ao synthesizer com cache pré-existente, veio %d", synth.calls)
+		t.Fatalf("esperava 0 chamadas ao TTSClient com cache pré-existente, veio %d", synth.calls)
 	}
 }
 
-func TestGetReferenceAudio_NonJapaneseExercise_ReturnsLanguageNotSupported(t *testing.T) {
+func TestGetReferenceAudio_LanguageWithoutRegisteredClient_ReturnsLanguageNotSupported(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{audio: []byte("fake-wav-bytes")}
-	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "en-US", ExpectedTranscript: "hi, how are you?"}}
-	service := tts.NewService(synth, finder, cacheDir)
+	jaClient := &fakeTTSClient{audio: []byte("audio-ja")}
+	enClient := &fakeTTSClient{audio: []byte("audio-en")}
+	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "fr-FR", ExpectedTranscript: "bonjour"}}
+	service := tts.NewService(map[string]tts.TTSClient{"ja": jaClient, "en": enClient}, finder, cacheDir)
 
 	_, err := service.GetReferenceAudio(context.Background(), uuid.New())
 	if err != tts.ErrLanguageNotSupported {
 		t.Fatalf("esperava ErrLanguageNotSupported, veio %v", err)
 	}
-	if synth.calls != 0 {
-		t.Fatalf("esperava 0 chamadas ao synthesizer pra idioma não suportado, veio %d", synth.calls)
+	if jaClient.calls != 0 || enClient.calls != 0 {
+		t.Fatalf("esperava 0 chamadas a qualquer TTSClient pra idioma sem client registrado, veio ja=%d en=%d", jaClient.calls, enClient.calls)
+	}
+}
+
+func TestGetReferenceAudio_RoutesToTheClientMatchingExerciseLanguage(t *testing.T) {
+	cacheDir := t.TempDir()
+	jaClient := &fakeTTSClient{audio: []byte("audio-ja")}
+	enClient := &fakeTTSClient{audio: []byte("audio-en")}
+	clients := map[string]tts.TTSClient{"ja": jaClient, "en": enClient}
+
+	jaFinder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
+	jaService := tts.NewService(clients, jaFinder, cacheDir)
+	jaAudio, err := jaService.GetReferenceAudio(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("unexpected error (ja): %v", err)
+	}
+	if string(jaAudio) != "audio-ja" || jaClient.calls != 1 || enClient.calls != 0 {
+		t.Fatalf("esperava roteamento pro TTSClient 'ja', veio audio=%q ja.calls=%d en.calls=%d", jaAudio, jaClient.calls, enClient.calls)
+	}
+
+	enFinder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "en-US", ExpectedTranscript: "hello"}}
+	enService := tts.NewService(clients, enFinder, cacheDir)
+	enAudio, err := enService.GetReferenceAudio(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("unexpected error (en): %v", err)
+	}
+	if string(enAudio) != "audio-en" || jaClient.calls != 1 || enClient.calls != 1 {
+		t.Fatalf("esperava roteamento pro TTSClient 'en', veio audio=%q ja.calls=%d en.calls=%d", enAudio, jaClient.calls, enClient.calls)
 	}
 }
 
 func TestGetReferenceAudio_ExerciseNotFound_PropagatesError(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{audio: []byte("fake-wav-bytes")}
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{err: exercises.ErrExerciseNotFound}
-	service := tts.NewService(synth, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
 
 	_, err := service.GetReferenceAudio(context.Background(), uuid.New())
 	if err != exercises.ErrExerciseNotFound {
@@ -144,15 +172,15 @@ func TestGetReferenceAudio_ExerciseNotFound_PropagatesError(t *testing.T) {
 	}
 }
 
-func TestGetReferenceAudio_SynthesizerError_DoesNotCache(t *testing.T) {
+func TestGetReferenceAudio_TTSClientError_DoesNotCache(t *testing.T) {
 	cacheDir := t.TempDir()
-	synth := &fakeSynthesizer{err: context.DeadlineExceeded}
+	synth := &fakeTTSClient{err: context.DeadlineExceeded}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(synth, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
 
 	exerciseID := uuid.New()
 	if _, err := service.GetReferenceAudio(context.Background(), exerciseID); err == nil {
-		t.Fatal("esperava erro quando o synthesizer falha")
+		t.Fatal("esperava erro quando o TTSClient falha")
 	}
 
 	if _, err := os.Stat(filepath.Join(cacheDir, exerciseID.String()+".wav")); !os.IsNotExist(err) {

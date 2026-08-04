@@ -58,7 +58,9 @@ func main() {
 	attemptsHandler := attempts.NewHandler(attemptsService)
 
 	voicevoxClient := tts.NewVoicevoxClient(cfg.VoicevoxURL, cfg.VoicevoxSpeakerID)
-	ttsService := tts.NewService(voicevoxClient, exercisesRepo, cfg.AudioCacheDir)
+	piperClient := tts.NewPiperClient(cfg.PiperAddress, cfg.PiperVoice)
+	ttsClients := map[string]tts.TTSClient{"ja": voicevoxClient, "en": piperClient}
+	ttsService := tts.NewService(ttsClients, exercisesRepo, cfg.AudioCacheDir)
 	ttsHandler := tts.NewHandler(ttsService)
 
 	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, cfg.CORSAllowedOrigins)
