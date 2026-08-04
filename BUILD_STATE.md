@@ -1,8 +1,68 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
+Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US).
 
 ## Última ação
+**Suporte multi-idioma (campo `language` de ponta a ponta + taxonomia fonética de inglês)** — pedido
+explícito do usuário, executado em 6 commits atômicos (schema → comparison engine → wiring
+attempts/stt-service → seed en-US → frontend → esta doc).
+
+1. **Migration `0011`**: coluna `language` (default `'ja-JP'`, aditiva) em `attempts` e
+   `phonetic_error_patterns` — mesma decisão de baixo risco da migration `0009` em `exercises`.
+   `phonetic_error_patterns` trocou a unique constraint de `(user_id, pattern_type)` pra
+   `(user_id, pattern_type, language)`; não é estritamente necessário hoje (nenhum `pattern_type` é
+   compartilhado entre os dois idiomas), mas deixa explícito e evita colisão se um nome genérico for
+   reaproveitado no futuro. Filtro `?language=` adicionado em `GET /exercises`.
+2. **`comparison.CompareLang(expected, actual, language)`** generaliza `Compare()` (que virou um atalho
+   pra `language="ja-JP"`, comportamento idêntico, nenhum teste antigo tocado) e adiciona as 5 categorias
+   de erro pra falantes de PT-BR aprendendo inglês pedidas pelo usuário: `TH_SUBSTITUICAO`,
+   `VOGAL_FINAL_ADICIONADA`, `VOGAL_REDUZIDA_IGNORADA`, `R_AMERICANO_TROCADO`,
+   `CONSOANTE_FINAL_OMITIDA` — 1 teste TDD por categoria (RED via erro de compilação antes da
+   implementação, GREEN depois), em `compare_english_test.go`. A normalização de inglês
+   (`normalizeEnglish`, `english.go`) **preserva espaços** (ao contrário do japonês, moraico) porque os
+   classificadores de fronteira de palavra (consoante/vogal final) dependem deles; o loop de diff em
+   `CompareLang` passou a rastrear `expIdx` (posição no array `expected` original) pra dar contexto de
+   vizinhança aos classificadores de inglês (dígrafo "th", fim de palavra).
+3. `attempts.Service.Submit` passa a chamar `CompareLang(..., exercise.Language)` em vez do `Compare()`
+   fixo em japonês, grava `attempt.Language`, e repassa `exercise.Language` tanto pro `Transcriber`
+   quanto pro `phoneticsRepo.IncrementPatterns`. `sttclient.Client.Transcribe` ganhou parâmetro
+   `language`, enviado como campo multipart. `stt-service` aceita form field opcional `language`
+   (`resolve_whisper_language` mapeia `ja-JP`/`en-US` pro código de 2 letras que o faster-whisper espera,
+   default `ja` preservado quando omitido — não quebra chamador antigo).
+4. **Migration `0012`**: importa os 30 exercícios de `seed/english_curriculum_seed.json`
+   (`language='en-US'`, categorias saudacoes/compras/restaurante/direcoes/emergencia_saude/
+   trabalho_social), `sprint_day_ref` 1-30 sequencial — trilha secundária separada da numeração 1-60 do
+   currículo ja-JP principal (o frontend agrupa por dia *depois* de filtrar por idioma, então não colide
+   visualmente). `expected_romaji` fica `NULL` (não aplicável a inglês).
+5. **Frontend**: toggle 🇯🇵/🇺🇸 em `ExercisesListPage` refiltra via `GET /exercises?language=`.
+   `SpeakButton` ganhou prop `lang` (default `ja-JP`, `en-US` quando o exercício é inglês) e agora compara
+   só o subtag primário de idioma (`ja`/`en`) contra as vozes instaladas, já que a região da voz varia por
+   sistema. `DiffComparison`/`kanaAlign`/`diffExplain` ficaram language-aware: `kanaAlign` ganhou
+   `normalizeEnglish` espelhando exatamente `english.go` no backend (preserva espaços, senão os índices de
+   `position` do diff dessincronizam do array de caracteres no cliente), e a legenda de romaji fica
+   desligada fora de `ja-JP` (senão duplicaria cada letra latina embaixo dela mesma). `diffExplain` ganhou
+   explicação em PT-BR pras 5 categorias novas.
+
+**Limitação conhecida e documentada (pedido explícito do usuário)**: a engine de comparação atual
+(Levenshtein de caracteres sobre o transcript do Whisper) **não captura stress/prosódia** — o próprio
+`seed/english_curriculum_seed.json` (campo `note_for_engineering`) já antecipava isso. Erros como vogal
+reduzida a schwa em sílaba átona dependem de *onde* a ênfase cai na palavra, não só de *quais* fonemas
+saíram, e o Whisper às vezes "corrige" mentalmente o áudio (transcrevendo a grafia correta mesmo com
+stress errado), então o diff nem chega a ver a divergência. `VOGAL_REDUZIDA_IGNORADA` cobre o caso onde o
+Whisper *transcreve* a vogal plena errada (ex: "əbaʊt" ouvido/transcrito como "abaut"), mas não pega o caso
+onde a transcrição sai ortograficamente correta apesar do stress errado. Não bloqueado por isso — é uma
+limitação estrutural do approach texto-a-texto, só resolvível com análise de áudio bruto (pitch/duração),
+fora do escopo atual.
+
+**Verificação end-to-end real**: `go build`/`go vet`/`go test ./...` (core-api, todos os pacotes),
+`pytest` dentro do container `stt-service` (6/6, incluindo os 4 novos de language), `tsc -b && vite
+build`/`oxlint`/`playwright test` (web, 6/6 specs e2e incluindo o novo `language-toggle.spec.ts`), e as
+migrations `0011`+`0012` aplicadas contra o Postgres real via `docker compose up -d --build`
+(`schema_migrations.version=12`, `dirty=false`, `30` exercícios `en-US` + `64` `ja-JP` confirmados via
+`psql`).
+
+## Última ação (importação do seed ampliado ja-JP — histórico)
 **Importação do seed curricular ampliado (54 novos exercícios `ja-JP`)** — pedido do usuário pra importar
 `japanese_curriculum_seed_giant.json`.
 
