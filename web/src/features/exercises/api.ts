@@ -9,6 +9,20 @@ export interface Exercise {
   expected_romaji?: string;
   sprint_day_ref: number;
   language: string;
+  scenario_id?: string;
+  order_in_scenario?: number;
+}
+
+export interface Scenario {
+  id: string;
+  language: string;
+  title_pt: string;
+  context_description_pt: string;
+  order_index: number;
+}
+
+export interface ScenarioDetail extends Scenario {
+  exercises: Exercise[];
 }
 
 export interface DiffEntry {
@@ -50,6 +64,10 @@ export function listExercises(sprintDay?: number, language?: string): Promise<Ex
 
 export function getExercise(id: string): Promise<Exercise> {
   return api.get<Exercise>(`/exercises/${id}`);
+}
+
+export function getScenario(id: string): Promise<ScenarioDetail> {
+  return api.get<ScenarioDetail>(`/scenarios/${id}`);
 }
 
 export function submitAttempt(exerciseId: string, audioBlob: Blob): Promise<AttemptResult> {
