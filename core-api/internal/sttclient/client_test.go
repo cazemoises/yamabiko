@@ -35,7 +35,7 @@ func TestTranscribe_SendsMultipartAndParsesResponse(t *testing.T) {
 	defer server.Close()
 
 	client := sttclient.New(server.URL)
-	result, err := client.Transcribe(context.Background(), "attempt.wav", strings.NewReader("fake-audio"))
+	result, err := client.Transcribe(context.Background(), "attempt.wav", strings.NewReader("fake-audio"), "ja-JP")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,6 +47,27 @@ func TestTranscribe_SendsMultipartAndParsesResponse(t *testing.T) {
 	}
 }
 
+func TestTranscribe_SendsLanguageField(t *testing.T) {
+	var receivedLanguage string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Fatalf("esperava multipart form válido, erro: %v", err)
+		}
+		receivedLanguage = r.FormValue("language")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"transcript":"hi","language":"en","confidence":0.9}`))
+	}))
+	defer server.Close()
+
+	client := sttclient.New(server.URL)
+	if _, err := client.Transcribe(context.Background(), "attempt.webm", strings.NewReader("fake-audio"), "en-US"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedLanguage != "en-US" {
+		t.Fatalf("esperava campo language='en-US' no multipart, veio %q", receivedLanguage)
+	}
+}
+
 func TestTranscribe_ReturnsErrorOnNonOKStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -55,7 +76,7 @@ func TestTranscribe_ReturnsErrorOnNonOKStatus(t *testing.T) {
 	defer server.Close()
 
 	client := sttclient.New(server.URL)
-	_, err := client.Transcribe(context.Background(), "attempt.wav", strings.NewReader("fake-audio"))
+	_, err := client.Transcribe(context.Background(), "attempt.wav", strings.NewReader("fake-audio"), "ja-JP")
 	if err == nil {
 		t.Fatal("esperava erro pra status não-OK")
 	}

@@ -41,7 +41,7 @@ type fakeTranscriber struct {
 	err        error
 }
 
-func (f *fakeTranscriber) Transcribe(_ context.Context, _ string, _ io.Reader) (*sttclient.TranscriptionResult, error) {
+func (f *fakeTranscriber) Transcribe(_ context.Context, _ string, _ io.Reader, _ string) (*sttclient.TranscriptionResult, error) {
 	if f.err != nil {
 		return nil, f.err
 	}

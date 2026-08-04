@@ -27,7 +27,10 @@ type TranscriptionResult struct {
 	Confidence float64 `json:"confidence"`
 }
 
-func (c *Client) Transcribe(ctx context.Context, filename string, audio io.Reader) (*TranscriptionResult, error) {
+// Transcribe envia o áudio e o idioma-alvo (ex: "ja-JP", "en-US") pro
+// stt-service — o Whisper transcreve melhor quando sabe de antemão em que
+// idioma o áudio está, em vez de detectar automaticamente.
+func (c *Client) Transcribe(ctx context.Context, filename string, audio io.Reader, language string) (*TranscriptionResult, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
@@ -36,6 +39,9 @@ func (c *Client) Transcribe(ctx context.Context, filename string, audio io.Reade
 		return nil, err
 	}
 	if _, err := io.Copy(part, audio); err != nil {
+		return nil, err
+	}
+	if err := writer.WriteField("language", language); err != nil {
 		return nil, err
 	}
 	if err := writer.Close(); err != nil {

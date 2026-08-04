@@ -20,12 +20,12 @@ def get_model() -> WhisperModel:
     return _model
 
 
-def transcribe(audio_path: str) -> dict:
+def transcribe(audio_path: str, language: str = "ja") -> dict:
     model = get_model()
     segments, info = model.transcribe(
         audio_path,
         beam_size=5,
-        language="ja",
+        language=language,
         task="transcribe",
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500),

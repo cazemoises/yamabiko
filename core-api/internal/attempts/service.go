@@ -16,7 +16,7 @@ import (
 )
 
 type Transcriber interface {
-	Transcribe(ctx context.Context, filename string, audio io.Reader) (*sttclient.TranscriptionResult, error)
+	Transcribe(ctx context.Context, filename string, audio io.Reader, language string) (*sttclient.TranscriptionResult, error)
 }
 
 type ExerciseFinder interface {
@@ -87,12 +87,12 @@ func (s *Service) Submit(ctx context.Context, userID, exerciseID uuid.UUID, file
 		return nil, err
 	}
 
-	transcription, err := s.transcriber.Transcribe(ctx, filename, audio)
+	transcription, err := s.transcriber.Transcribe(ctx, filename, audio, exercise.Language)
 	if err != nil {
 		return nil, err
 	}
 
-	result := comparison.Compare(exercise.ExpectedTranscript, transcription.Transcript)
+	result := comparison.CompareLang(exercise.ExpectedTranscript, transcription.Transcript, exercise.Language)
 	now := s.now()
 
 	attempt := &Attempt{
