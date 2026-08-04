@@ -3,6 +3,46 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 
 ## Última ação
+**Botão "Ouvir pronúncia esperada" via Web Speech API** (pedido explícito do usuário).
+
+- `web/src/components/audio/SpeakButton.tsx` (novo componente reutilizável): `window.speechSynthesis` +
+  `SpeechSynthesisUtterance(text)` com `lang = "ja-JP"`, falando o texto recebido por prop. Fallback
+  correto pro caso de o browser/SO não ter voz japonesa instalada: em vez de falhar silenciosamente ou
+  falar com sotaque/voz errada (ex: ler kana com voz en-US), o botão fica **desabilitado** com
+  `title` explicando ("Nenhuma voz em japonês disponível neste navegador/sistema") — checagem via
+  `speechSynthesis.getVoices().some(v => v.lang.startsWith("ja"))`. A lista de vozes só vem populada de
+  verdade depois do evento `voiceschanged` em alguns browsers (Chrome busca vozes de forma assíncrona),
+  então o componente escuta esse evento em vez de checar só uma vez no mount — sem isso o botão ficaria
+  preso em "desabilitado" mesmo em browsers com voz JA disponível, só porque a checagem rodou cedo demais.
+- Dois lugares, como pedido: (1) `ExercisePage.tsx`, ao lado do `expected_transcript`/`expected_romaji`,
+  antes de gravar; (2) `DiffComparison.tsx`, na linha "Esperado" dentro do card de resultado, pro aluno
+  comparar depois de errar sem precisar voltar/re-gravar.
+- **Cobertura de teste, limitação documentada conforme pedido do usuário**: Web Speech API não é bem
+  suportada em ambiente headless do Playwright/Chromium — confirmado nesta sessão via
+  `page.evaluate(() => speechSynthesis.getVoices())` no Chromium headless usado pelos e2e: só retorna
+  vozes `pt-BR`/`en-US`, nenhuma `ja-*`. Isso na verdade **validou o caminho de fallback** (botão
+  desabilitado + tooltip, confirmado visualmente via screenshot Playwright descartável, nas duas
+  localizações), mas **não valida o caminho feliz** (fala real em japonês) porque esse ambiente não tem
+  voz JA pra testar contra. Não foi escrito um e2e automatizado forçando esse caminho (seria frágil e
+  ambiente-dependente, exatamente como o usuário antecipou) — verificação do caminho feliz fica pendente
+  de teste manual num browser desktop real com voz `ja-JP` instalada (Windows/macOS/Chrome costumam ter
+  por padrão; não confirmado nesta sessão por falta de acesso interativo a um browser com áudio).
+- `tsc -b && vite build`, `oxlint` e os 4 specs e2e existentes (não relacionados a este botão, mas
+  confirmam que nada quebrou) passando.
+
+## Débito técnico de médio prazo — qualidade da pronúncia de referência
+A Web Speech API (`SpeechSynthesisUtterance`) tem qualidade/naturalidade de voz **limitada e inconsistente
+entre usuários** — depende inteiramente de quais vozes TTS o SO/browser de cada aluno tem instalado
+(Windows/macOS/Chrome variam bastante; alguns ambientes não têm voz `ja-JP` nenhuma, como confirmado no
+Chromium headless usado pelos testes desta sessão). Isso é aceitável pro MVP (é grátis, nativo, zero
+infra), mas se a experiência de pronúncia de referência precisar ser mais consistente e de melhor
+qualidade no futuro, a alternativa é gerar áudio via um serviço de TTS real (ex: Google Cloud TTS, Azure
+Speech, ElevenLabs) e **cachear o áudio gerado por exercício** (já que `expected_transcript` é estático
+por exercício, não precisa gerar de novo a cada request) — evita custo/latência recorrente. **Não
+implementado agora** — só documentado como opção pra quando/se a qualidade da Web Speech API se mostrar
+insuficiente na prática (ex: feedback do próprio usuário depois de usar o produto no dia a dia).
+
+## Última ação (romaji em todos os caracteres — histórico)
 **Romaji em todos os caracteres do comparador de diff, não só nos divergentes** (follow-up de UX sobre o
 item 2/3 da sessão anterior).
 

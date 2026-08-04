@@ -1,6 +1,7 @@
 import { alignForDisplay } from "../../lib/kanaAlign";
 import { toRomaji } from "../../lib/romaji";
 import { explainDiff } from "./diffExplain";
+import { SpeakButton } from "../../components/audio/SpeakButton";
 import type { DiffEntry } from "./api";
 
 interface DiffComparisonProps {
@@ -21,6 +22,7 @@ export function DiffComparison({ expected, actual, diff }: DiffComparisonProps) 
             <DiffChar key={col.position} char={col.expectedChar} mismatch={col.entry !== null} />
           ))}
         </div>
+        <SpeakButton text={expected} className="speak-button-inline" />
       </div>
       <div className="diff-row" data-testid="diff-row-actual">
         <span className="diff-row-label">Você disse</span>

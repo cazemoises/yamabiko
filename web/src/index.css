@@ -170,6 +170,19 @@ button.recording {
   font-style: italic;
 }
 
+.speak-button {
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.speak-button-inline {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 2px 8px;
+  margin-left: auto;
+}
+
 ul {
   list-style: none;
   padding: 0;

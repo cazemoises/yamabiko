@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getExercise, submitAttempt, type AttemptResult, type Exercise } from "./api";
 import { AudioRecorder } from "../../components/audio/AudioRecorder";
+import { SpeakButton } from "../../components/audio/SpeakButton";
 import { DiffComparison } from "./DiffComparison";
 import { ApiError } from "../../lib/apiClient";
 
@@ -43,6 +44,7 @@ export function ExercisePage() {
       <h1>{exercise.prompt_pt}</h1>
       <p className="expected-transcript">{exercise.expected_transcript}</p>
       {exercise.expected_romaji && <p className="expected-romaji">{exercise.expected_romaji}</p>}
+      <SpeakButton text={exercise.expected_transcript} />
 
       <AudioRecorder onRecorded={handleRecorded} disabled={submitting} />
 
