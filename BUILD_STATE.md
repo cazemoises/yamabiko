@@ -4,6 +4,47 @@
 Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US).
 
 ## Última ação
+**VOICEVOX como TTS de referência pra ja-JP** — pedido explícito do usuário, resolve de fato o débito
+técnico que estava documentado desde a sessão do botão de pronúncia ("qualidade da pronúncia de
+referência", removido desta doc — ver decisão abaixo). Executado em 4 commits atômicos (docker-compose →
+tts client → endpoint+cache → frontend).
+
+- **Decisão: VOICEVOX só pra ja-JP, Web Speech API mantida pra en-US.** VOICEVOX é um motor de TTS
+  japonês — não fala inglês. Em vez de introduzir um segundo provedor de TTS só pra en-US (custo/infra
+  extra pra um caso que a Web Speech API já resolve razoavelmente bem, já que `en-US` tem cobertura de
+  voz muito mais consistente entre SOs/browsers do que `ja-JP` tinha), o produto ficou híbrido de
+  propósito: `GET /exercises/{id}/reference-audio` só atua se `exercise.language` for `ja-JP` — pra
+  `en-US` devolve `404` com mensagem explícita ("use a Web Speech API no frontend"), e o `SpeakButton` no
+  React já checa o idioma e escolhe o caminho certo (áudio real via `<audio>` pra ja-JP, `speechSynthesis`
+  intacto pra tudo o mais). Se um TTS real de inglês vier a ser necessário no futuro, é o mesmo padrão
+  (`Synthesizer` interface + endpoint + cache) com outro provider — não bloqueado, só não implementado
+  agora porque não há motivo (Web Speech API já cobre en-US bem).
+- **`docker-compose.yml`**: serviço `voicevox` (`voicevox/voicevox_engine:cpu-latest`, variante CPU —
+  mesma decisão de não assumir GPU do `stt-service`) exposto **só na rede interna** do compose (`expose:`,
+  sem `ports:` mapeada pro host — só o `core-api` precisa falar com ele). Volume nomeado `audio-cache`
+  montado em `/app/audio-cache` no `core-api` (mesmo padrão do volume `whisper-models` do `stt-service`).
+- **`core-api/internal/tts/`**: `VoicevoxClient.Synthesize(text)` encapsula o fluxo padrão de 2 passos da
+  API do VOICEVOX (`POST /audio_query` monta a receita prosódica, `POST /synthesis` renderiza o WAV a
+  partir dela) — mesmo padrão de `sttclient`, único ponto do core-api que fala o protocolo HTTP do
+  VOICEVOX. `Service.GetReferenceAudio(exerciseID)`: rejeita idioma != ja-JP (`ErrLanguageNotSupported`),
+  verifica `audio-cache/{exercise_id}.wav` em disco antes de qualquer chamada ao VOICEVOX, sintetiza e
+  cacheia no cache miss, serve direto do disco em requisições seguintes — `expected_transcript` é estático
+  por exercício, então gerar de novo a cada request seria custo/latência à toa (mesmo raciocínio do débito
+  antigo, agora resolvido de verdade em vez de só documentado).
+- **Verificação end-to-end real contra a stack via `docker compose up`**: 1ª chamada ao endpoint pra um
+  exercício ja-JP levou ~0.79s (cache miss, chamou o VOICEVOX de verdade), 2ª chamada ~0.06s (cache hit,
+  bytes idênticos à 1ª); exercício en-US confirmado devolvendo `404` com a mensagem esperada.
+- **Frontend**: `SpeakButton` ganhou o branch ja-JP (busca o WAV via `api.getBlob`, toca via `<audio>`
+  real) mantendo o branch antigo (`speechSynthesis`) intacto pra outros idiomas — `apiClient.ts` ganhou
+  `api.getBlob()` reaproveitando a lógica de auth/retry-de-refresh já existente. Novo
+  `e2e/reference-audio.spec.ts`: o fluxo ja-JP agora é **testável em headless** (ao contrário da Web
+  Speech API, que não roda no Chromium headless — a limitação que motivou o débito original), mockando o
+  endpoint com um WAV mínimo válido e confirmando que o `<audio>` recebeu um `blob:` URL e que `play()`
+  não ficou pausado/rejeitado.
+- `go build`/`go vet`/`go test ./...` (core-api, incluindo os novos pacotes `tts`), `tsc -b && vite
+  build`/`oxlint`/`playwright test` (web, 8/8 specs e2e) todos passando.
+
+## Última ação (suporte multi-idioma — histórico)
 **Suporte multi-idioma (campo `language` de ponta a ponta + taxonomia fonética de inglês)** — pedido
 explícito do usuário, executado em 6 commits atômicos (schema → comparison engine → wiring
 attempts/stt-service → seed en-US → frontend → esta doc).
@@ -120,18 +161,6 @@ migrations `0011`+`0012` aplicadas contra o Postgres real via `docker compose up
   por padrão; não confirmado nesta sessão por falta de acesso interativo a um browser com áudio).
 - `tsc -b && vite build`, `oxlint` e os 4 specs e2e existentes (não relacionados a este botão, mas
   confirmam que nada quebrou) passando.
-
-## Débito técnico de médio prazo — qualidade da pronúncia de referência
-A Web Speech API (`SpeechSynthesisUtterance`) tem qualidade/naturalidade de voz **limitada e inconsistente
-entre usuários** — depende inteiramente de quais vozes TTS o SO/browser de cada aluno tem instalado
-(Windows/macOS/Chrome variam bastante; alguns ambientes não têm voz `ja-JP` nenhuma, como confirmado no
-Chromium headless usado pelos testes desta sessão). Isso é aceitável pro MVP (é grátis, nativo, zero
-infra), mas se a experiência de pronúncia de referência precisar ser mais consistente e de melhor
-qualidade no futuro, a alternativa é gerar áudio via um serviço de TTS real (ex: Google Cloud TTS, Azure
-Speech, ElevenLabs) e **cachear o áudio gerado por exercício** (já que `expected_transcript` é estático
-por exercício, não precisa gerar de novo a cada request) — evita custo/latência recorrente. **Não
-implementado agora** — só documentado como opção pra quando/se a qualidade da Web Speech API se mostrar
-insuficiente na prática (ex: feedback do próprio usuário depois de usar o produto no dia a dia).
 
 ## Última ação (romaji em todos os caracteres — histórico)
 **Romaji em todos os caracteres do comparador de diff, não só nos divergentes** (follow-up de UX sobre o
