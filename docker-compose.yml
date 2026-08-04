@@ -17,6 +17,26 @@ services:
     expose:
       - "50021"
 
+  # Piper (motor de TTS em inglês open-source) gera o áudio de referência dos
+  # exercícios en-US, mesmo raciocínio do voicevox pra ja-JP. A imagem
+  # empacota o wyoming-piper (baixa o modelo de voz automaticamente no 1º
+  # start) e fala o protocolo Wyoming — TCP puro com framing JSON, não HTTP
+  # (confirmado empiricamente: não responde a requisição HTTP nenhuma; ver
+  # core-api/internal/tts/piper_client.go pro cliente). PIPER_VOICE fixa a
+  # voz servida: en_US-lessac-medium é uma voz adulta neutra de qualidade
+  # média-alta do catálogo oficial do Piper (nada de mascote, mesmo raciocínio
+  # da escolha de speaker do voicevox). Volume próprio pro modelo baixado
+  # persistir entre restarts, mesmo padrão do whisper-models. Sem `ports:` —
+  # só o core-api fala com ele, fica só na rede interna do compose.
+  piper:
+    image: lscr.io/linuxserver/piper:latest
+    environment:
+      - PIPER_VOICE=en_US-lessac-medium
+    volumes:
+      - piper-voices:/config
+    expose:
+      - "10200"
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -45,6 +65,8 @@ services:
       - CORS_ALLOWED_ORIGINS=http://localhost:5173
       - VOICEVOX_URL=http://voicevox:50021
       - VOICEVOX_SPEAKER_ID=30
+      - PIPER_URL=piper:10200
+      - PIPER_VOICE=en_US-lessac-medium
       - AUDIO_CACHE_DIR=/app/audio-cache
     volumes:
       - audio-cache:/app/audio-cache
@@ -55,8 +77,11 @@ services:
         condition: service_started
       voicevox:
         condition: service_started
+      piper:
+        condition: service_started
 
 volumes:
   whisper-models:
   postgres-data:
   audio-cache:
+  piper-voices:
