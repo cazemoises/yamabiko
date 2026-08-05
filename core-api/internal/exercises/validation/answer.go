@@ -72,6 +72,8 @@ func ValidateAnswer(exerciseType string, typeData json.RawMessage, req AnswerReq
 		return validateVerbConjugation(typeData, req)
 	case "matching_pairs":
 		return validateMatchingPairs(typeData, req)
+	case "true_false":
+		return validateTrueFalse(typeData, req)
 	default:
 		return AnswerResult{}, ErrUnsupportedType
 	}
