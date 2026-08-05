@@ -2,12 +2,98 @@
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
-com preview + catálogo de vozes ampliado + **fix de CORS pra PATCH** — **CONCLUÍDO** (ver "Última ação"
-abaixo). Sem trabalho pendente conhecido no momento; próxima sessão pode perguntar ao usuário o que
-priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI no `web` apesar do backend
-existir — ver histórico).
+com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + **backend dos 7 novos tipos de exercício
+(FASE A)** — **CONCLUÍDO** (ver "Última ação" abaixo). **EM ANDAMENTO: FASE B — import do design
+`Yamabiko.dc.html` e substituição do frontend + layout desktop + persistência de tema/accent** (pedido do
+mesmo usuário, "duas fases, nessa ordem, sem pausar entre elas" — ver task list ativa e a seção logo depois
+desta pra retomar exatamente de onde parou).
 
-## Última ação — bugfix: CORS bloqueava PATCH (ausência de Access-Control-Allow-Origin)
+## Última ação — FASE A: backend dos 7 novos tipos de exercício
+
+Pedido do usuário: ampliar o produto além do exercício de áudio original, cobrindo 7 formatos sem áudio
+(multiple_choice_translation, word_order, verb_conjugation, dictation, free_translation, matching_pairs,
+true_false), sem tocar no fluxo de áudio existente (attempts/comparison/stt-service intactos). Executado em
+10 commits atômicos, cada um com testes passando antes do próximo.
+
+1. **Migration `0016`**: `exercises` ganha `exercise_type` (`TEXT NOT NULL DEFAULT 'audio_pronunciation'`,
+   `CHECK` com os 8 valores — mesmo padrão de `difficulty`, não um `ENUM` nativo do Postgres, mais fácil de
+   estender depois) e `type_data` (`JSONB` nullable — `NULL` pra `audio_pronunciation` e `dictation`, que
+   reaproveitam `expected_transcript`/`expected_romaji` já existentes). Verificado ao vivo: 105 exercícios
+   pré-existentes preservados como `audio_pronunciation` depois da migration.
+2. **GET exposure**: `exercises.Exercise` ganhou `ExerciseType`/`TypeData` (`json.RawMessage`, omitido
+   quando `NULL`), `PostgresRepository.List`/`FindByID` passaram a selecionar as 2 colunas novas.
+   `GET /scenarios/{id}` reusa `exercises.Exercise` direto (não tem struct/query próprios pros exercícios
+   embutidos), então passou a expor os campos automaticamente, sem tocar no pacote `scenarios`. Confirmado
+   ao vivo nos dois endpoints via curl.
+3. **`core-api/internal/exercises/validation/`** (pacote novo, TDD literal em cada um dos 7 tipos — teste
+   escrito primeiro, RED confirmado via erro de compilação, só depois a implementação):
+   - `AnswerRequest`/`AnswerResult` compartilhados (`answer.go`) — payload polimórfico (só o campo
+     relevante ao `exercise_type` vem preenchido) e resposta com o veredito binário + a resposta canônica
+     no formato do tipo (pro cliente mostrar feedback sem reimplementar parsing de `type_data`).
+   - `multiple_choice_translation`/`verb_conjugation`: mesmo núcleo `validateIndexAnswer` (escolha entre
+     opções). Edge cases: índice fora do range não vira panic/erro (só incorreto), campo
+     `selected_index` ausente é `ErrMissingAnswerField` (não confundido com "escolheu índice 0").
+   - `word_order`: compara `submitted_order` com `correct_order` elemento a elemento. Edge case:
+     comprimento diferente (palavra faltando/duplicada) dá incorreto sem panic de index-out-of-range.
+   - `matching_pairs`: binário sem crédito parcial — mapa `left->right` canônico, ignora a ordem de
+     submissão. Edge case coberto explicitamente: 2 de 3 pares certos conta como incorreto.
+   - `true_false`: edge case é `answer` ausente (`ErrMissingAnswerField`, não confundido com "respondeu
+     false" pelo zero-value de `*bool`).
+   - `dictation`/`free_translation`: não usam `AnswerRequest` (são texto-a-texto, não escolha binária) —
+     `ValidateDictation` é um wrapper fino sobre `comparison.CompareLang` (mesma engine Levenshtein do
+     áudio, sem stt-service); `ValidateFreeTranslation` roda `CompareLang` contra CADA
+     `acceptable_answers` e fica com o melhor `SimilarityScore` (edge case testado: bate com a 2ª resposta
+     aceitável, não a 1ª, e ainda assim dá PASS).
+4. **`POST /exercises/{id}/answer`** (os 5 tipos binários) e **`POST /exercises/{id}/text-attempt`**
+   (dictation/free_translation) — `exercises.Handler` ganhou os 2 métodos + `findExerciseOrWriteError`
+   (preâmbulo compartilhado). Cada endpoint rejeita (400) o `exercise_type` que não é dele, incluindo
+   `audio_pronunciation` (que continua exclusivo de `/attempts`) — mensagem de erro aponta pro endpoint
+   certo. Verificado ao vivo contra Postgres real: os 7 tipos testados via curl (7 exercícios de teste
+   inseridos manualmente por SQL, removidos depois da verificação), incluindo os guard-rails de tipo
+   cruzado.
+
+**Decisão de escopo, documentada por não ter sido pedida explicitamente**: `/answer` e `/text-attempt` são
+**stateless** — não persistem tentativa em `attempts`, não tocam XP/streak/SRS/`phonetic_error_patterns`. O
+pedido do usuário especificou só "validação binária certo/errado" e "reaproveita comparison/", sem menção a
+gamificação pros tipos novos (Sec. "don't add features beyond what's requested" do CLAUDE.md). Se o usuário
+quiser esses 7 tipos participando de XP/streak/SRS/heatmap de erros no futuro, é trabalho novo, não
+implícito neste pedido — sinalizar antes de expandir escopo.
+
+**Achado divertido de ambiente, não bug**: durante a verificação via curl no Git Bash do Windows, um `-d`
+inline com JSON contendo caracteres não-ASCII (kana) corrompeu a codificação e fez um teste de `word_order`
+correto aparentar estar errado — mesmo problema já documentado numa sessão anterior (ver histórico "seed
+pilot"). Resolvido re-testando com `--data-binary @arquivo.json` (arquivo escrito via Python com
+`encoding='utf-8'`) — não era bug no endpoint.
+
+`go build`/`go vet`/`go test ./...` (core-api, incluindo os 22 testes novos do pacote `validation`) e
+`tsc -b`/`oxlint`/`playwright test` (web, 11/11 specs e2e — não deveriam ter sido afetados por mudança
+nenhuma no backend, confirmado que não foram) limpos em cada um dos 10 commits.
+
+## Próximo passo imediato — FASE B (import de design + novo frontend), pedida na mesma mensagem da FASE A
+
+Ainda não iniciada no momento em que este parágrafo foi escrito pela última vez — se você está lendo isto
+numa sessão nova e a FASE B já tem commits depois deste ponto no `git log`, esta seção ficou desatualizada,
+confie no git e no que estiver escrito ACIMA dela (mais recente) em vez daqui.
+
+Pedido literal: usar o `claude_design` MCP (`https://api.anthropic.com/v1/design/mcp`, auth via
+`/design-login`) pra importar `https://claude.ai/design/p/c66cb199-1083-4b66-8d10-ec8fc60be837?file=Yamabiko.dc.html`,
+ler `Yamabiko.dc.html` (19 frames, mobile-only 390x844) + `support.js`, e substituir o frontend React
+existente pela camada visual importada — reaproveitando a lógica de API já existente (endpoints, auth com
+refresh automático), mapeando cada frame pro estado real (áudio → `/attempts`, os 5 binários → `/answer`,
+ditado/tradução livre → `/text-attempt`, config de voz → `GET /tts/voices` + `PATCH
+/users/me/voice-preference`, progresso → dados reais de tentativas/erros fonéticos). Precisa de uma versão
+desktop (sidebar >~1024px substituindo bottom nav, breakpoint único, não duas implementações) e persistência
+real de tema/accent color (`users.theme`/`users.accent_color`, endpoint próprio, padrão de
+`preferred_voice_ja/en`). Commits separados por: import do design, cada tipo de exercício (áudio primeiro,
+depois os 7 novos), tela de resultado, config de voz, progresso, layout desktop, persistência de
+tema/accent. e2e Playwright cobrindo pelo menos 1 exercício de cada tipo ponta a ponta, mobile E desktop.
+
+Primeiro passo real: checar se o MCP `claude_design` está disponível nesta sessão/ambiente (`ToolSearch`) e
+se a autenticação (`/design-login`) é possível de forma não-interativa ou se precisa de ação do usuário —
+isso determina se a Fase B é executável autonomamente ou se bate numa das 3 exceções de pausa válida da
+Sec. 0 do CLAUDE.md ("necessidade de credencial externa que você não tem").
+
+## Última ação (histórico — bugfix: CORS bloqueava PATCH, ausência de Access-Control-Allow-Origin)
 
 Bug reportado pelo usuário: `PATCH /users/me/voice-preference` devolvia `200`/`204` de verdade (diferente
 do bug de CORS anterior, que era um `405` de preflight — ver histórico "CORS + layout" abaixo), mas o
