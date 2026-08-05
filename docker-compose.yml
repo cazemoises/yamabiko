@@ -72,9 +72,7 @@ services:
       - STT_SERVICE_URL=http://stt-service:8000
       - CORS_ALLOWED_ORIGINS=http://localhost:5173
       - VOICEVOX_URL=http://voicevox:50021
-      - VOICEVOX_SPEAKER_ID=30
       - PIPER_URL=piper:10200
-      - PIPER_VOICE=en_US-lessac-medium
       - AUDIO_CACHE_DIR=/app/audio-cache
     volumes:
       - audio-cache:/app/audio-cache

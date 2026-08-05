@@ -54,6 +54,14 @@ func VoicesForLanguage(language string) []Voice {
 	return result
 }
 
+// allVoices devolve uma cópia do catálogo curado inteiro, todos os
+// idiomas — usado por GET /tts/voices sem filtro de language=.
+func allVoices() []Voice {
+	result := make([]Voice, len(curatedVoices))
+	copy(result, curatedVoices)
+	return result
+}
+
 // DefaultVoiceID é a 1ª voz curada de cada idioma (ver curatedVoices) — é
 // o que GetReferenceAudio usa quando o usuário não escolheu nenhuma
 // preferência, ou quando a preferência salva não bate com nenhuma voz do

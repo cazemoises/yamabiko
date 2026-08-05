@@ -50,8 +50,8 @@ func TestSynthesize_CallsAudioQueryThenSynthesisAndReturnsWav(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := tts.NewVoicevoxClient(server.URL, "1")
-	audio, err := client.Synthesize(context.Background(), "こんにちは")
+	client := tts.NewVoicevoxClient(server.URL)
+	audio, err := client.Synthesize(context.Background(), "こんにちは", "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -70,8 +70,8 @@ func TestSynthesize_ReturnsErrorWhenAudioQueryFails(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := tts.NewVoicevoxClient(server.URL, "1")
-	_, err := client.Synthesize(context.Background(), "")
+	client := tts.NewVoicevoxClient(server.URL)
+	_, err := client.Synthesize(context.Background(), "", "1")
 	if err == nil {
 		t.Fatal("esperava erro quando /audio_query falha")
 	}
@@ -89,8 +89,8 @@ func TestSynthesize_ReturnsErrorWhenSynthesisFails(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := tts.NewVoicevoxClient(server.URL, "1")
-	_, err := client.Synthesize(context.Background(), "こんにちは")
+	client := tts.NewVoicevoxClient(server.URL)
+	_, err := client.Synthesize(context.Background(), "こんにちは", "1")
 	if err == nil {
 		t.Fatal("esperava erro quando /synthesis falha")
 	}

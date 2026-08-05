@@ -58,8 +58,8 @@ func main() {
 	attemptsService := attempts.NewService(attemptsRepo, sttClient, exercisesRepo, srsRepo, usersRepo, phoneticsRepo)
 	attemptsHandler := attempts.NewHandler(attemptsService)
 
-	voicevoxClient := tts.NewVoicevoxClient(cfg.VoicevoxURL, cfg.VoicevoxSpeakerID)
-	piperClient := tts.NewPiperClient(cfg.PiperAddress, cfg.PiperVoice)
+	voicevoxClient := tts.NewVoicevoxClient(cfg.VoicevoxURL)
+	piperClient := tts.NewPiperClient(cfg.PiperAddress)
 	ttsClients := map[string]tts.TTSClient{"ja": voicevoxClient, "en": piperClient}
 	ttsService := tts.NewService(ttsClients, exercisesRepo, cfg.AudioCacheDir)
 	ttsHandler := tts.NewHandler(ttsService)

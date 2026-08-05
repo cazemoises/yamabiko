@@ -16,9 +16,7 @@ type Config struct {
 	STTServiceURL      string
 	CORSAllowedOrigins []string
 	VoicevoxURL        string
-	VoicevoxSpeakerID  string
 	PiperAddress       string
-	PiperVoice         string
 	AudioCacheDir      string
 }
 
@@ -57,21 +55,6 @@ func Load() (*Config, error) {
 		port = "8080"
 	}
 
-	voicevoxSpeakerID := os.Getenv("VOICEVOX_SPEAKER_ID")
-	if voicevoxSpeakerID == "" {
-		// speaker 30 = "No.7 - アナウンス" (estilo locutor/anúncio) — voz neutra e
-		// adulta, otimizada pra leitura clara de texto, em vez do default puro do
-		// VOICEVOX (speaker 1, ずんだもん/Zundamon, voz de mascote/personagem — não
-		// serve como referência de pronúncia num app de aprendizado). Ver
-		// BUILD_STATE.md pro raciocínio completo da escolha.
-		voicevoxSpeakerID = "30"
-	}
-
-	piperVoice := os.Getenv("PIPER_VOICE")
-	if piperVoice == "" {
-		piperVoice = "en_US-lessac-medium" // voz adulta neutra do catálogo oficial do Piper — ver BUILD_STATE.md
-	}
-
 	audioCacheDir := os.Getenv("AUDIO_CACHE_DIR")
 	if audioCacheDir == "" {
 		audioCacheDir = "audio-cache"
@@ -86,9 +69,7 @@ func Load() (*Config, error) {
 		STTServiceURL:      sttServiceURL,
 		CORSAllowedOrigins: corsAllowedOrigins(),
 		VoicevoxURL:        voicevoxURL,
-		VoicevoxSpeakerID:  voicevoxSpeakerID,
 		PiperAddress:       piperAddress,
-		PiperVoice:         piperVoice,
 		AudioCacheDir:      audioCacheDir,
 	}, nil
 }

@@ -72,6 +72,11 @@ func NewRouter(
 			r.Get("/{id}", scenariosHandler.Detail)
 		})
 
+		r.Route("/tts/voices", func(r chi.Router) {
+			r.Get("/", ttsHandler.Voices)
+			r.Get("/{voice_id}/preview", ttsHandler.VoicePreview)
+		})
+
 		r.Get("/dashboard/heatmap", dashboardHandler.Heatmap)
 	})
 

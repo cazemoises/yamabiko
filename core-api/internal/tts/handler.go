@@ -30,7 +30,10 @@ func (h *Handler) ReferenceAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	audio, err := h.service.GetReferenceAudio(r.Context(), id)
+	// "" = usa o default do idioma do exercício; a resolução da preferência
+	// de voz salva do usuário é trabalho do commit de preferência de usuário
+	// (ver BUILD_STATE.md), não deste handler.
+	audio, err := h.service.GetReferenceAudio(r.Context(), id, "")
 	switch {
 	case errors.Is(err, exercises.ErrExerciseNotFound):
 		writeError(w, http.StatusNotFound, "exercício não encontrado")
@@ -40,6 +43,47 @@ func (h *Handler) ReferenceAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	case err != nil:
 		writeError(w, http.StatusBadGateway, "erro ao gerar áudio de referência: "+err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "audio/wav")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(audio)
+}
+
+// Voices serve GET /tts/voices?language= — devolve o catálogo curado
+// (voice.go) do idioma pedido. Sem language= devolve o catálogo inteiro
+// (todos os idiomas), útil pro frontend montar o seletor de voz sem saber
+// de antemão em qual idioma o usuário está.
+func (h *Handler) Voices(w http.ResponseWriter, r *http.Request) {
+	language := r.URL.Query().Get("language")
+
+	var voices []Voice
+	if language == "" {
+		voices = allVoices()
+	} else {
+		voices = VoicesForLanguage(language)
+	}
+
+	writeJSON(w, http.StatusOK, voices)
+}
+
+// VoicePreview serve GET /tts/voices/{voice_id}/preview — sintetiza (ou
+// serve do cache) uma frase curta na voz pedida, pro usuário ouvir antes de
+// escolher como preferência.
+func (h *Handler) VoicePreview(w http.ResponseWriter, r *http.Request) {
+	voiceID := chi.URLParam(r, "voice_id")
+
+	audio, err := h.service.GetVoicePreview(r.Context(), voiceID)
+	switch {
+	case errors.Is(err, ErrVoiceNotFound):
+		writeError(w, http.StatusNotFound, "voz desconhecida")
+		return
+	case errors.Is(err, ErrLanguageNotSupported):
+		writeError(w, http.StatusNotFound, "preview não disponível pra essa voz")
+		return
+	case err != nil:
+		writeError(w, http.StatusBadGateway, "erro ao gerar preview: "+err.Error())
 		return
 	}
 

@@ -94,8 +94,8 @@ func TestPiperClient_Synthesize_ReconstructsValidWavFromChunks(t *testing.T) {
 		return out.Bytes()
 	})
 
-	client := tts.NewPiperClient(addr, "en_US-lessac-medium")
-	wav, err := client.Synthesize(context.Background(), "hello world")
+	client := tts.NewPiperClient(addr)
+	wav, err := client.Synthesize(context.Background(), "hello world", "en_US-lessac-medium")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestPiperClient_Synthesize_ReconstructsValidWavFromChunks(t *testing.T) {
 	}
 }
 
-func TestPiperClient_Synthesize_SendsConfiguredVoice(t *testing.T) {
+func TestPiperClient_Synthesize_SendsRequestedVoice(t *testing.T) {
 	var capturedVoice string
 	addr := startFakeWyomingServer(t, func(t *testing.T, msg map[string]any) []byte {
 		data, _ := msg["data"].(map[string]any)
@@ -132,8 +132,8 @@ func TestPiperClient_Synthesize_SendsConfiguredVoice(t *testing.T) {
 		return out.Bytes()
 	})
 
-	client := tts.NewPiperClient(addr, "en_US-lessac-medium")
-	if _, err := client.Synthesize(context.Background(), "hi"); err != nil {
+	client := tts.NewPiperClient(addr)
+	if _, err := client.Synthesize(context.Background(), "hi", "en_US-lessac-medium"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if capturedVoice != "en_US-lessac-medium" {
@@ -141,7 +141,7 @@ func TestPiperClient_Synthesize_SendsConfiguredVoice(t *testing.T) {
 	}
 }
 
-func TestPiperClient_Synthesize_NoVoiceConfigured_OmitsVoiceField(t *testing.T) {
+func TestPiperClient_Synthesize_EmptyVoiceID_OmitsVoiceField(t *testing.T) {
 	hadVoiceField := true
 	addr := startFakeWyomingServer(t, func(t *testing.T, msg map[string]any) []byte {
 		data, _ := msg["data"].(map[string]any)
@@ -153,8 +153,8 @@ func TestPiperClient_Synthesize_NoVoiceConfigured_OmitsVoiceField(t *testing.T) 
 		return out.Bytes()
 	})
 
-	client := tts.NewPiperClient(addr, "")
-	if _, err := client.Synthesize(context.Background(), "hi"); err != nil {
+	client := tts.NewPiperClient(addr)
+	if _, err := client.Synthesize(context.Background(), "hi", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if hadVoiceField {
@@ -167,18 +167,18 @@ func TestPiperClient_Synthesize_ServerError_ReturnsError(t *testing.T) {
 		return wyomingMessage("error", map[string]any{"text": "modelo não encontrado"}, nil)
 	})
 
-	client := tts.NewPiperClient(addr, "voz-inexistente")
-	if _, err := client.Synthesize(context.Background(), "hi"); err == nil {
+	client := tts.NewPiperClient(addr)
+	if _, err := client.Synthesize(context.Background(), "hi", "voz-inexistente"); err == nil {
 		t.Fatal("esperava erro quando o servidor devolve uma mensagem type=error")
 	}
 }
 
 func TestPiperClient_Synthesize_ConnectionRefused_ReturnsError(t *testing.T) {
-	client := tts.NewPiperClient("127.0.0.1:1", "") // porta 1 não deve ter nada escutando
+	client := tts.NewPiperClient("127.0.0.1:1") // porta 1 não deve ter nada escutando
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if _, err := client.Synthesize(ctx, "hi"); err == nil {
+	if _, err := client.Synthesize(ctx, "hi", ""); err == nil {
 		t.Fatal("esperava erro ao tentar conectar num endereço sem servidor")
 	}
 }

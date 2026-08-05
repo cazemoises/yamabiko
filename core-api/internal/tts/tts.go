@@ -8,7 +8,10 @@ package tts
 
 import "context"
 
-// TTSClient sintetiza texto em áudio (WAV).
+// TTSClient sintetiza texto em áudio (WAV) numa voz específica do motor —
+// providerVoiceID é o identificador cru que o motor entende (speaker id do
+// VOICEVOX, nome de modelo do Piper), resolvido a partir do voice_id
+// estável do catálogo (Sec. voice.go) por quem chama.
 type TTSClient interface {
-	Synthesize(ctx context.Context, text string) ([]byte, error)
+	Synthesize(ctx context.Context, text, providerVoiceID string) ([]byte, error)
 }

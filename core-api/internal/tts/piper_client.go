@@ -23,15 +23,14 @@ import (
 // este client remonta o WAV a partir do formato anunciado em "audio-start".
 type PiperClient struct {
 	address     string // host:port — endereço TCP, não uma URL HTTP
-	voice       string // nome do modelo de voz (ex: "en_US-lessac-medium"); "" usa o default do servidor
 	dialTimeout time.Duration
 }
 
-func NewPiperClient(address, voice string) *PiperClient {
-	return &PiperClient{address: address, voice: voice, dialTimeout: 10 * time.Second}
+func NewPiperClient(address string) *PiperClient {
+	return &PiperClient{address: address, dialTimeout: 10 * time.Second}
 }
 
-func (c *PiperClient) Synthesize(ctx context.Context, text string) ([]byte, error) {
+func (c *PiperClient) Synthesize(ctx context.Context, text, providerVoiceID string) ([]byte, error) {
 	dialer := net.Dialer{Timeout: c.dialTimeout}
 	conn, err := dialer.DialContext(ctx, "tcp", c.address)
 	if err != nil {
@@ -43,7 +42,7 @@ func (c *PiperClient) Synthesize(ctx context.Context, text string) ([]byte, erro
 		_ = conn.SetDeadline(deadline)
 	}
 
-	if err := c.sendSynthesize(conn, text); err != nil {
+	if err := c.sendSynthesize(conn, text, providerVoiceID); err != nil {
 		return nil, fmt.Errorf("piper: falha ao enviar synthesize: %w", err)
 	}
 
@@ -54,10 +53,10 @@ func (c *PiperClient) Synthesize(ctx context.Context, text string) ([]byte, erro
 	return audio, nil
 }
 
-func (c *PiperClient) sendSynthesize(conn net.Conn, text string) error {
+func (c *PiperClient) sendSynthesize(conn net.Conn, text, providerVoiceID string) error {
 	data := map[string]any{"text": text}
-	if c.voice != "" {
-		data["voice"] = map[string]string{"name": c.voice}
+	if providerVoiceID != "" {
+		data["voice"] = map[string]string{"name": providerVoiceID}
 	}
 
 	encoded, err := json.Marshal(map[string]any{"type": "synthesize", "data": data})
