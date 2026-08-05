@@ -31,13 +31,7 @@ func NewRouter(
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   corsAllowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	r.Use(cors.Handler(corsOptions(corsAllowedOrigins)))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -82,4 +76,25 @@ func NewRouter(
 	})
 
 	return r
+}
+
+// corsOptions é a fonte única de verdade da config de CORS — extraída pra
+// função própria pra ser testável sem precisar instanciar todos os handlers
+// reais do NewRouter (que exigem repositórios Postgres). AllowedMethods
+// precisa listar TODO verbo HTTP usado por alguma rota: diferente do que a
+// intuição sugere, o go-chi/cors (rs/cors por baixo) confere AllowedMethods
+// não só no preflight (OPTIONS), mas também na requisição real — um método
+// fora da lista faz a resposta real sair 200 (a rota roda normal) mas SEM
+// Access-Control-Allow-Origin, e o browser bloqueia a resposta no cliente
+// mesmo a requisição tendo chegado ao servidor. Foi exatamente o que
+// aconteceu com PATCH /users/me/voice-preference: a rota existia e
+// respondia 200, só faltava "PATCH" nesta lista.
+func corsOptions(allowedOrigins []string) cors.Options {
+	return cors.Options{
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}
 }

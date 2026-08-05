@@ -2,11 +2,70 @@
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
-com preview + **catálogo de vozes ampliado** — **CONCLUÍDO** (ver "Última ação" abaixo). Sem trabalho
-pendente conhecido no momento; próxima sessão pode perguntar ao usuário o que priorizar em seguida
-(gamificação/SRS da Fase 6 original ainda não tem UI no `web` apesar do backend existir — ver histórico).
+com preview + catálogo de vozes ampliado + **fix de CORS pra PATCH** — **CONCLUÍDO** (ver "Última ação"
+abaixo). Sem trabalho pendente conhecido no momento; próxima sessão pode perguntar ao usuário o que
+priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI no `web` apesar do backend
+existir — ver histórico).
 
-## Última ação — catálogo de vozes ampliado (VOICEVOX +8, Piper trocado pra "high" quality)
+## Última ação — bugfix: CORS bloqueava PATCH (ausência de Access-Control-Allow-Origin)
+
+Bug reportado pelo usuário: `PATCH /users/me/voice-preference` devolvia `200`/`204` de verdade (diferente
+do bug de CORS anterior, que era um `405` de preflight — ver histórico "CORS + layout" abaixo), mas o
+browser bloqueava a resposta por faltar `Access-Control-Allow-Origin`.
+
+**Causa raiz confirmada** (não assumida): a rota está sim dentro do `chi.Router` que carrega o middleware
+de CORS (`r.Route("/users/me", ...)` mora no mesmo `r` que recebeu `r.Use(cors.Handler(...))` em
+`router.go` — não é um sub-mount separado nem um router novo sem herdar middleware, então a hipótese #1 do
+pedido do usuário foi descartada por leitura direta do código). A causa real é a #2: `AllowedMethods` do
+`cors.Options` listava só `GET, POST, PUT, DELETE, OPTIONS` — **sem `PATCH`**. Verificado no código-fonte
+do `github.com/go-chi/cors@v1.2.2` (`cors.go`, `handleActualRequest`): diferente do que a intuição sugere,
+essa lib confere `AllowedMethods` não só no preflight, mas **também na requisição real** — um método fora
+da lista faz a rota rodar normal (200/204, a `AllowedMethods` não bloqueia a request em si) só que sem
+`Access-Control-Allow-Origin` na resposta, e é o browser quem descarta a resposta no lado do cliente. Bate
+exatamente com o sintoma relatado.
+
+**Fix**: `core-api/internal/httpserver/router.go` — `"PATCH"` adicionado a `AllowedMethods`. A config de
+CORS foi extraída pra uma função própria (`corsOptions(allowedOrigins []string) cors.Options`) só pra ficar
+testável sem precisar instanciar todos os handlers reais do `NewRouter` (que exigem repositórios Postgres).
+
+**Teste de regressão novo**: `core-api/internal/httpserver/router_test.go` (pacote não tinha nenhum teste
+antes). 3 testes contra um router mínimo usando a mesma `corsOptions` de produção:
+- `TestCORS_ActualRequest_SetsAllowOriginForEveryAllowedMethod`: uma requisição REAL (não preflight, com
+  `Origin` setado) pra cada verbo em `AllowedMethods` (GET/POST/PUT/PATCH/DELETE) — falha se
+  `Access-Control-Allow-Origin` não vier, que é exatamente o tipo de bug que passaria despercebido num
+  teste que só checa status HTTP. Esse é o caso pedido explicitamente pelo usuário (cobertura de PATCH
+  especificamente) — e cobre os outros verbos também, pra pegar a mesma regressão numa rota DELETE ou PUT
+  futura que esqueça de entrar na lista.
+- `TestCORS_Preflight_PatchIsInAllowedMethods`: preflight `OPTIONS` com
+  `Access-Control-Request-Method: PATCH` precisa devolver `PATCH` em `Access-Control-Allow-Methods`.
+- `TestCORS_DisallowedOrigin_NeverGetsAllowOrigin`: confirma que a correção não afrouxou a whitelist —
+  origin fora da lista continua sem o header, pra qualquer método (inclusive PATCH).
+
+**Verificação real contra a stack** (`docker compose up -d --build core-api`), não só os testes Go:
+- `curl` simulando preflight real (`OPTIONS` + `Origin: http://localhost:5173` +
+  `Access-Control-Request-Method: PATCH`): `Access-Control-Allow-Methods: PATCH` presente.
+- `curl` simulando a requisição real (`PATCH` com `Origin` + `Authorization` de um usuário de teste
+  registrado ao vivo): `204 No Content` com `Access-Control-Allow-Origin: http://localhost:5173` — o exato
+  cenário que estava quebrado (antes do fix essa mesma chamada devolvia 204 sem o header).
+  `Origin: http://evil.example.com` na mesma rota PATCH continua sem o header (whitelist intacta).
+- **Browser real** (Chromium via Playwright, script descartável — não commitado): `vite` dev server real em
+  `localhost:5173` conversando com o `core-api` real em `localhost:9001` (não mockado como o
+  `voice-settings.spec.ts` existente, que intercepta a rede via `page.route` e por isso não pegaria esse
+  bug). Fluxo completo via UI (`/register` → `/settings/voice` → trocar pra 🇺🇸 → "Selecionar" na voz Ryan):
+  o `PATCH` saiu com `Origin` real, a resposta chegou `204` com `access-control-allow-origin` correto, zero
+  erros de CORS no console, e a UI marcou "✓ Selecionada" com sucesso (se tivesse sido bloqueado pelo
+  browser, o app cairia no `catch` e mostraria "Erro ao salvar preferência de voz"). Um evento
+  `requestfailed`/`ERR_ABORTED` apareceu nos logs de rede do Chromium pra essa mesma requisição — investigado
+  e descartado como falso positivo: é um artefato conhecido do Chrome DevTools Protocol pra respostas `204`
+  (sem corpo pra ler, o CDP às vezes reporta a conexão como abortada mesmo depois do `response` event já ter
+  vindo com status 204 e os headers corretos) — confirmado comparando a ordem dos eventos (`REQUEST` →
+  `RESPONSE 204` com o header certo → só depois o `FAILED ERR_ABORTED`), não uma falha de CORS real.
+
+`go build`/`go vet`/`go test ./...` (core-api, incluindo o pacote `httpserver` novo) e
+`tsc -b`/`oxlint`/`playwright test` (web, 11/11 specs e2e, `voice-settings.spec.ts` já cobria o fluxo via
+mock) limpos.
+
+## Última ação (histórico — catálogo de vozes ampliado, VOICEVOX +8, Piper trocado pra "high" quality)
 
 Pedido do usuário: ampliar a curadoria de vozes de `GET /tts/voices` — mais 8-10 speakers VOICEVOX
 (gênero/tom/idade variados) e mais modelos Piper en-US com timbres distintos. No meio da execução, o
