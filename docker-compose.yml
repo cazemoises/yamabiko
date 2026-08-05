@@ -19,15 +19,23 @@ services:
 
   # Piper (motor de TTS em inglês open-source) gera o áudio de referência dos
   # exercícios en-US, mesmo raciocínio do voicevox pra ja-JP. A imagem
-  # empacota o wyoming-piper (baixa o modelo de voz automaticamente no 1º
-  # start) e fala o protocolo Wyoming — TCP puro com framing JSON, não HTTP
-  # (confirmado empiricamente: não responde a requisição HTTP nenhuma; ver
-  # core-api/internal/tts/piper_client.go pro cliente). PIPER_VOICE fixa a
-  # voz servida: en_US-lessac-medium é uma voz adulta neutra de qualidade
-  # média-alta do catálogo oficial do Piper (nada de mascote, mesmo raciocínio
-  # da escolha de speaker do voicevox). Volume próprio pro modelo baixado
-  # persistir entre restarts, mesmo padrão do whisper-models. Sem `ports:` —
-  # só o core-api fala com ele, fica só na rede interna do compose.
+  # empacota o wyoming-piper e fala o protocolo Wyoming — TCP puro com framing
+  # JSON, não HTTP (confirmado empiricamente: não responde a requisição HTTP
+  # nenhuma; ver core-api/internal/tts/piper_client.go pro cliente).
+  # PIPER_VOICE fixa só a voz de arranque do container (a que ele baixa e
+  # carrega antes de qualquer request) — o core-api pode pedir qualquer outro
+  # modelo por nome via o campo "voice" da mensagem Wyoming (confirmado no
+  # código-fonte de wyoming_piper: cada synthesize resolve a voz pedida e
+  # baixa sob demanda se ainda não estiver em /config, cacheando pro resto da
+  # vida do volume). 3 modelos curados (curadoria pedida pelo usuário, ver
+  # core-api/internal/tts/voice.go e BUILD_STATE.md), todos já baixados e
+  # persistidos no volume piper-voices nesta sessão:
+  #   - en_US-lessac-medium: voz masculina neutra (default, já em uso)
+  #   - en_US-amy-medium: voz feminina
+  #   - en_US-ryan-medium: voz masculina jovem, timbre distinto do lessac
+  # Volume próprio pros modelos baixados persistirem entre restarts, mesmo
+  # padrão do whisper-models. Sem `ports:` — só o core-api fala com ele, fica
+  # só na rede interna do compose.
   piper:
     image: lscr.io/linuxserver/piper:latest
     environment:

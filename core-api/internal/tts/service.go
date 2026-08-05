@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -74,11 +73,4 @@ func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID) (
 
 func (s *Service) cachePath(exerciseID uuid.UUID) string {
 	return filepath.Join(s.cacheDir, exerciseID.String()+".wav")
-}
-
-// primaryLanguageSubtag extrai o subtag primário de uma tag BCP-47 (ex: "ja"
-// de "ja-JP", "en" de "en-US") — é a chave usada tanto aqui quanto em
-// comparison.CompareLang pra despachar por idioma sem depender da região.
-func primaryLanguageSubtag(language string) string {
-	return strings.ToLower(strings.SplitN(language, "-", 2)[0])
 }
