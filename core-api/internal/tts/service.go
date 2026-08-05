@@ -37,6 +37,15 @@ type ExerciseFinder interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*exercises.Exercise, error)
 }
 
+// PreferredVoiceLookup resolve a voz preferida (id estável do catálogo,
+// voice.go) que um usuário salvou pra um idioma — implementada por
+// users.PostgresRepository. A interface mora aqui (não em users) porque
+// tts nunca deve importar users: é o catálogo de vozes (tts) que é a
+// fonte de verdade sobre voice_ids válidos, users só guarda a escolha.
+type PreferredVoiceLookup interface {
+	GetVoicePreference(ctx context.Context, userID uuid.UUID, language string) (voiceID string, err error)
+}
+
 // Service gera (e cacheia em disco) o áudio de referência de um exercício,
 // escolhendo o TTSClient certo pelo idioma do exercício (chave do mapa:
 // subtag primário do idioma, ex: "ja" de "ja-JP", "en" de "en-US"). O cache
@@ -44,16 +53,17 @@ type ExerciseFinder interface {
 // sentido chamar o motor de TTS de novo a cada request pro mesmo exercício
 // (mesmo raciocínio de custo/latência do débito documentado em
 // BUILD_STATE.md sobre a Web Speech API, mas resolvido de fato aqui). A
-// chave de cache é só o exercise_id, então funciona pros dois idiomas sem
-// mudança — cada exercício só tem 1 idioma, nunca colide.
+// chave de cache inclui o voice_id (exercises/{exercise_id}__{voice_id}.wav)
+// pra não misturar áudio de vozes diferentes do mesmo exercício.
 type Service struct {
-	clients        map[string]TTSClient
-	exerciseFinder ExerciseFinder
-	cacheDir       string
+	clients         map[string]TTSClient
+	exerciseFinder  ExerciseFinder
+	voicePreference PreferredVoiceLookup
+	cacheDir        string
 }
 
-func NewService(clients map[string]TTSClient, exerciseFinder ExerciseFinder, cacheDir string) *Service {
-	return &Service{clients: clients, exerciseFinder: exerciseFinder, cacheDir: cacheDir}
+func NewService(clients map[string]TTSClient, exerciseFinder ExerciseFinder, voicePreference PreferredVoiceLookup, cacheDir string) *Service {
+	return &Service{clients: clients, exerciseFinder: exerciseFinder, voicePreference: voicePreference, cacheDir: cacheDir}
 }
 
 // GetReferenceAudio sintetiza (ou serve do cache) o expected_transcript do
@@ -67,7 +77,32 @@ func (s *Service) GetReferenceAudio(ctx context.Context, exerciseID uuid.UUID, v
 	if err != nil {
 		return nil, err
 	}
+	return s.synthesizeReference(ctx, exercise, exerciseID, voiceID)
+}
 
+// ReferenceAudioForUser é o que os handlers HTTP chamam de verdade: resolve
+// a voz preferida salva do usuário (via voicePreference) pro idioma do
+// exercício e delega pra GetReferenceAudio. Qualquer erro na busca de
+// preferência (usuário sem preferência salva, falha de banco, etc.) cai
+// silenciosamente pro default do idioma — fail-open, o áudio de referência
+// nunca deveria parar de funcionar por causa de uma preferência.
+func (s *Service) ReferenceAudioForUser(ctx context.Context, exerciseID, userID uuid.UUID) ([]byte, error) {
+	exercise, err := s.exerciseFinder.FindByID(ctx, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+
+	voiceID := ""
+	if s.voicePreference != nil {
+		if preferred, err := s.voicePreference.GetVoicePreference(ctx, userID, exercise.Language); err == nil {
+			voiceID = preferred
+		}
+	}
+
+	return s.synthesizeReference(ctx, exercise, exerciseID, voiceID)
+}
+
+func (s *Service) synthesizeReference(ctx context.Context, exercise *exercises.Exercise, exerciseID uuid.UUID, voiceID string) ([]byte, error) {
 	voice, ok := s.resolveVoice(voiceID, exercise.Language)
 	if !ok {
 		return nil, ErrLanguageNotSupported

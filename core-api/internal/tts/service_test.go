@@ -40,6 +40,20 @@ func (f *fakeExerciseFinder) FindByID(_ context.Context, _ uuid.UUID) (*exercise
 	return f.exercise, nil
 }
 
+type fakeVoicePreference struct {
+	voiceID string
+	err     error
+	calls   int
+}
+
+func (f *fakeVoicePreference) GetVoicePreference(_ context.Context, _ uuid.UUID, _ string) (string, error) {
+	f.calls++
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.voiceID, nil
+}
+
 // referenceCachePath espelha Service.referenceCachePath (não exportado) —
 // só pra os testes montarem/conferirem o caminho esperado sem acoplar em
 // detalhe de implementação além da convenção documentada em
@@ -52,7 +66,7 @@ func TestGetReferenceAudio_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	exerciseID := uuid.New()
 	audio, err := service.GetReferenceAudio(context.Background(), exerciseID, "")
@@ -80,7 +94,7 @@ func TestGetReferenceAudio_CacheHit_DoesNotCallTTSClientAgain(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	exerciseID := uuid.New()
 
@@ -107,7 +121,7 @@ func TestGetReferenceAudio_PreExistingCacheFile_NeverCallsTTSClient(t *testing.T
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("nao-deveria-ser-usado")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	exerciseID := uuid.New()
 	cachedPath := referenceCachePath(cacheDir, exerciseID, tts.DefaultVoiceID("ja-JP"))
@@ -136,7 +150,7 @@ func TestGetReferenceAudio_LanguageWithoutRegisteredClient_ReturnsLanguageNotSup
 	jaClient := &fakeTTSClient{audio: []byte("audio-ja")}
 	enClient := &fakeTTSClient{audio: []byte("audio-en")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "fr-FR", ExpectedTranscript: "bonjour"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": jaClient, "en": enClient}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": jaClient, "en": enClient}, finder, nil, cacheDir)
 
 	_, err := service.GetReferenceAudio(context.Background(), uuid.New(), "")
 	if err != tts.ErrLanguageNotSupported {
@@ -154,7 +168,7 @@ func TestGetReferenceAudio_RoutesToTheClientMatchingExerciseLanguage(t *testing.
 	clients := map[string]tts.TTSClient{"ja": jaClient, "en": enClient}
 
 	jaFinder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	jaService := tts.NewService(clients, jaFinder, cacheDir)
+	jaService := tts.NewService(clients, jaFinder, nil, cacheDir)
 	jaAudio, err := jaService.GetReferenceAudio(context.Background(), uuid.New(), "")
 	if err != nil {
 		t.Fatalf("unexpected error (ja): %v", err)
@@ -164,7 +178,7 @@ func TestGetReferenceAudio_RoutesToTheClientMatchingExerciseLanguage(t *testing.
 	}
 
 	enFinder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "en-US", ExpectedTranscript: "hello"}}
-	enService := tts.NewService(clients, enFinder, cacheDir)
+	enService := tts.NewService(clients, enFinder, nil, cacheDir)
 	enAudio, err := enService.GetReferenceAudio(context.Background(), uuid.New(), "")
 	if err != nil {
 		t.Fatalf("unexpected error (en): %v", err)
@@ -178,7 +192,7 @@ func TestGetReferenceAudio_ExerciseNotFound_PropagatesError(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{err: exercises.ErrExerciseNotFound}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	_, err := service.GetReferenceAudio(context.Background(), uuid.New(), "")
 	if err != exercises.ErrExerciseNotFound {
@@ -190,7 +204,7 @@ func TestGetReferenceAudio_TTSClientError_DoesNotCache(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{err: context.DeadlineExceeded}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	exerciseID := uuid.New()
 	if _, err := service.GetReferenceAudio(context.Background(), exerciseID, ""); err == nil {
@@ -207,7 +221,7 @@ func TestGetReferenceAudio_ExplicitVoiceID_UsesItsProviderVoiceAndOwnCacheKey(t 
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	exerciseID := uuid.New()
 	chosenVoiceID := "ja-female-natural"
@@ -233,7 +247,7 @@ func TestGetReferenceAudio_UnknownOrMismatchedVoiceID_FallsBackToLanguageDefault
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
 	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
 
 	for _, voiceID := range []string{"voice-id-que-nao-existe", "en-lessac"} { // último é válido, mas de outro idioma
 		exerciseID := uuid.New()
@@ -251,7 +265,7 @@ func TestGetReferenceAudio_UnknownOrMismatchedVoiceID_FallsBackToLanguageDefault
 func TestGetVoicePreview_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("preview-wav-bytes")}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, nil, cacheDir)
 
 	audio, err := service.GetVoicePreview(context.Background(), "ja-announcer-neutral")
 	if err != nil {
@@ -273,7 +287,7 @@ func TestGetVoicePreview_CacheMiss_SynthesizesAndCaches(t *testing.T) {
 func TestGetVoicePreview_CacheHit_DoesNotCallTTSClientAgain(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("preview-wav-bytes")}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, nil, cacheDir)
 
 	if _, err := service.GetVoicePreview(context.Background(), "ja-announcer-neutral"); err != nil {
 		t.Fatalf("unexpected error na 1ª chamada: %v", err)
@@ -289,7 +303,7 @@ func TestGetVoicePreview_CacheHit_DoesNotCallTTSClientAgain(t *testing.T) {
 func TestGetVoicePreview_UnknownVoiceID_ReturnsErrVoiceNotFound(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("preview-wav-bytes")}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, nil, cacheDir)
 
 	_, err := service.GetVoicePreview(context.Background(), "voice-id-que-nao-existe")
 	if err != tts.ErrVoiceNotFound {
@@ -297,5 +311,64 @@ func TestGetVoicePreview_UnknownVoiceID_ReturnsErrVoiceNotFound(t *testing.T) {
 	}
 	if synth.calls != 0 {
 		t.Fatalf("esperava 0 chamadas ao TTSClient pra voice_id desconhecido, veio %d", synth.calls)
+	}
+}
+
+func TestReferenceAudioForUser_UsesSavedPreference(t *testing.T) {
+	cacheDir := t.TempDir()
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
+	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
+	preference := &fakeVoicePreference{voiceID: "ja-female-natural"}
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, preference, cacheDir)
+
+	exerciseID := uuid.New()
+	if _, err := service.ReferenceAudioForUser(context.Background(), exerciseID, uuid.New()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if preference.calls != 1 {
+		t.Fatalf("esperava 1 consulta à preferência salva, veio %d", preference.calls)
+	}
+	if synth.lastProviderVoice != "8" {
+		t.Fatalf("esperava providerVoiceID '8' (speaker de ja-female-natural), veio %q", synth.lastProviderVoice)
+	}
+
+	cachedPath := referenceCachePath(cacheDir, exerciseID, "ja-female-natural")
+	if _, err := os.Stat(cachedPath); err != nil {
+		t.Fatalf("esperava cache sob a chave da voz preferida: %v", err)
+	}
+}
+
+func TestReferenceAudioForUser_PreferenceLookupError_FallsBackToDefault(t *testing.T) {
+	cacheDir := t.TempDir()
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
+	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
+	preference := &fakeVoicePreference{err: context.DeadlineExceeded}
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, preference, cacheDir)
+
+	exerciseID := uuid.New()
+	if _, err := service.ReferenceAudioForUser(context.Background(), exerciseID, uuid.New()); err != nil {
+		t.Fatalf("esperava fail-open (sem erro) quando a busca de preferência falha, veio: %v", err)
+	}
+
+	defaultCachedPath := referenceCachePath(cacheDir, exerciseID, tts.DefaultVoiceID("ja-JP"))
+	if _, err := os.Stat(defaultCachedPath); err != nil {
+		t.Fatalf("esperava fallback pro default do idioma quando a preferência falha: %v", err)
+	}
+}
+
+func TestReferenceAudioForUser_NoVoicePreferenceLookupConfigured_UsesDefault(t *testing.T) {
+	cacheDir := t.TempDir()
+	synth := &fakeTTSClient{audio: []byte("fake-wav-bytes")}
+	finder := &fakeExerciseFinder{exercise: &exercises.Exercise{Language: "ja-JP", ExpectedTranscript: "こんにちは"}}
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, finder, nil, cacheDir)
+
+	exerciseID := uuid.New()
+	if _, err := service.ReferenceAudioForUser(context.Background(), exerciseID, uuid.New()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	defaultCachedPath := referenceCachePath(cacheDir, exerciseID, tts.DefaultVoiceID("ja-JP"))
+	if _, err := os.Stat(defaultCachedPath); err != nil {
+		t.Fatalf("esperava fallback pro default quando nenhum PreferredVoiceLookup foi injetado: %v", err)
 	}
 }

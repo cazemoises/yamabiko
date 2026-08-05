@@ -17,4 +17,6 @@ type Profile struct {
 	LongestStreakDays int        `json:"longest_streak_days"`
 	LastAttemptDate   *time.Time `json:"last_attempt_date,omitempty"`
 	Badges            []string   `json:"badges"`
+	PreferredVoiceJA  *string    `json:"preferred_voice_ja,omitempty"`
+	PreferredVoiceEN  *string    `json:"preferred_voice_en,omitempty"`
 }

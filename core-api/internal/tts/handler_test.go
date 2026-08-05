@@ -21,7 +21,7 @@ func newTestRouter(handler *tts.Handler) http.Handler {
 }
 
 func TestHandler_Voices_FiltersByLanguage(t *testing.T) {
-	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, t.TempDir())
+	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, nil, t.TempDir())
 	router := newTestRouter(tts.NewHandler(service))
 
 	req := httptest.NewRequest(http.MethodGet, "/tts/voices?language=en-US", nil)
@@ -47,7 +47,7 @@ func TestHandler_Voices_FiltersByLanguage(t *testing.T) {
 }
 
 func TestHandler_Voices_NoLanguageFilter_ReturnsWholeCatalog(t *testing.T) {
-	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, t.TempDir())
+	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, nil, t.TempDir())
 	router := newTestRouter(tts.NewHandler(service))
 
 	req := httptest.NewRequest(http.MethodGet, "/tts/voices", nil)
@@ -75,7 +75,7 @@ func TestHandler_Voices_NoLanguageFilter_ReturnsWholeCatalog(t *testing.T) {
 func TestHandler_VoicePreview_ReturnsAudioAndCaches(t *testing.T) {
 	cacheDir := t.TempDir()
 	synth := &fakeTTSClient{audio: []byte("preview-wav-bytes")}
-	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, cacheDir)
+	service := tts.NewService(map[string]tts.TTSClient{"ja": synth}, &fakeExerciseFinder{}, nil, cacheDir)
 	router := newTestRouter(tts.NewHandler(service))
 
 	req := httptest.NewRequest(http.MethodGet, "/tts/voices/ja-announcer-neutral/preview", nil)
@@ -104,7 +104,7 @@ func TestHandler_VoicePreview_ReturnsAudioAndCaches(t *testing.T) {
 }
 
 func TestHandler_VoicePreview_UnknownVoiceID_Returns404(t *testing.T) {
-	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, t.TempDir())
+	service := tts.NewService(map[string]tts.TTSClient{}, &fakeExerciseFinder{}, nil, t.TempDir())
 	router := newTestRouter(tts.NewHandler(service))
 
 	req := httptest.NewRequest(http.MethodGet, "/tts/voices/voice-id-que-nao-existe/preview", nil)

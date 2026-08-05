@@ -61,7 +61,7 @@ func main() {
 	voicevoxClient := tts.NewVoicevoxClient(cfg.VoicevoxURL)
 	piperClient := tts.NewPiperClient(cfg.PiperAddress)
 	ttsClients := map[string]tts.TTSClient{"ja": voicevoxClient, "en": piperClient}
-	ttsService := tts.NewService(ttsClients, exercisesRepo, cfg.AudioCacheDir)
+	ttsService := tts.NewService(ttsClients, exercisesRepo, usersRepo, cfg.AudioCacheDir)
 	ttsHandler := tts.NewHandler(ttsService)
 
 	scenariosRepo := scenarios.NewPostgresRepository(pool)

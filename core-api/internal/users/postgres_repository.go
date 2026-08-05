@@ -3,6 +3,8 @@ package users
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,13 +23,15 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 
 func (r *PostgresRepository) FindProfileByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, email, name, created_at, current_sprint_day, xp_total, current_streak_days, longest_streak_days, last_attempt_date
+		`SELECT id, email, name, created_at, current_sprint_day, xp_total, current_streak_days, longest_streak_days,
+		        last_attempt_date, preferred_voice_ja, preferred_voice_en
 		 FROM users WHERE id = $1`,
 		id,
 	)
 	var p Profile
 	err := row.Scan(&p.ID, &p.Email, &p.Name, &p.CreatedAt, &p.CurrentSprintDay,
-		&p.XPTotal, &p.CurrentStreakDays, &p.LongestStreakDays, &p.LastAttemptDate)
+		&p.XPTotal, &p.CurrentStreakDays, &p.LongestStreakDays, &p.LastAttemptDate,
+		&p.PreferredVoiceJA, &p.PreferredVoiceEN)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -101,4 +105,63 @@ func (r *PostgresRepository) AwardBadges(ctx context.Context, userID uuid.UUID, 
 		}
 	}
 	return nil
+}
+
+// GetVoicePreference implementa tts.PreferredVoiceLookup. 2 colunas fixas
+// (preferred_voice_ja/en) em vez de interpolar o nome da coluna a partir de
+// language — SELECT as duas sempre, escolhe em Go qual devolver.
+func (r *PostgresRepository) GetVoicePreference(ctx context.Context, userID uuid.UUID, language string) (string, error) {
+	row := r.pool.QueryRow(ctx, `SELECT preferred_voice_ja, preferred_voice_en FROM users WHERE id = $1`, userID)
+
+	var ja, en *string
+	if err := row.Scan(&ja, &en); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrUserNotFound
+		}
+		return "", err
+	}
+
+	var preferred *string
+	switch primaryLanguageSubtag(language) {
+	case "ja":
+		preferred = ja
+	case "en":
+		preferred = en
+	}
+	if preferred == nil {
+		return "", nil
+	}
+	return *preferred, nil
+}
+
+// SetVoicePreference grava a preferência de voz do usuário pro idioma
+// pedido — voiceID="" limpa a preferência (volta pro default do idioma).
+func (r *PostgresRepository) SetVoicePreference(ctx context.Context, userID uuid.UUID, language, voiceID string) error {
+	var value *string
+	if voiceID != "" {
+		value = &voiceID
+	}
+
+	var query string
+	switch primaryLanguageSubtag(language) {
+	case "ja":
+		query = `UPDATE users SET preferred_voice_ja = $2 WHERE id = $1`
+	case "en":
+		query = `UPDATE users SET preferred_voice_en = $2 WHERE id = $1`
+	default:
+		return fmt.Errorf("%w: %s", ErrUnsupportedVoiceLanguage, language)
+	}
+
+	tag, err := r.pool.Exec(ctx, query, userID, value)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func primaryLanguageSubtag(language string) string {
+	return strings.ToLower(strings.SplitN(language, "-", 2)[0])
 }

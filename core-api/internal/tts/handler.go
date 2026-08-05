@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yamabiko/core-api/internal/exercises"
+	appmiddleware "github.com/yamabiko/core-api/internal/middleware"
 )
 
 type Handler struct {
@@ -30,10 +31,13 @@ func (h *Handler) ReferenceAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// "" = usa o default do idioma do exercício; a resolução da preferência
-	// de voz salva do usuário é trabalho do commit de preferência de usuário
-	// (ver BUILD_STATE.md), não deste handler.
-	audio, err := h.service.GetReferenceAudio(r.Context(), id, "")
+	userID, ok := appmiddleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "usuário não autenticado")
+		return
+	}
+
+	audio, err := h.service.ReferenceAudioForUser(r.Context(), id, userID)
 	switch {
 	case errors.Is(err, exercises.ErrExerciseNotFound):
 		writeError(w, http.StatusNotFound, "exercício não encontrado")
