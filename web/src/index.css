@@ -108,7 +108,8 @@ a {
 .auth-page form,
 .exercise-page,
 .exercises-list,
-.dashboard-page {
+.dashboard-page,
+.voice-settings-page {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -117,7 +118,8 @@ a {
 
 .exercise-page,
 .exercises-list,
-.dashboard-page {
+.dashboard-page,
+.voice-settings-page {
   max-width: 600px;
 }
 
@@ -395,6 +397,49 @@ li a {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-alt);
+}
+
+.voice-list {
+  gap: 8px;
+}
+
+.voice-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.voice-row-selected {
+  border-color: var(--accent);
+}
+
+.voice-name {
+  flex: 1;
+  color: var(--text-h);
+}
+
+.voice-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.voice-preview-button {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.voice-select-button {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.voice-select-button-active {
+  border-color: var(--pass);
+  color: var(--pass);
+  cursor: default;
 }
 
 table {

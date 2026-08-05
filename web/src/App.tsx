@@ -6,6 +6,7 @@ import { RegisterPage } from "./features/auth/RegisterPage";
 import { ExercisesListPage } from "./features/exercises/ExercisesListPage";
 import { ExercisePage } from "./features/exercises/ExercisePage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { VoiceSettingsPage } from "./features/settings/VoiceSettingsPage";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -21,6 +22,7 @@ function NavBar() {
       <span className="brand">やまびこ</span>
       <Link to="/exercises">Exercícios</Link>
       <Link to="/dashboard">Progresso</Link>
+      <Link to="/settings/voice">Voz</Link>
       <button type="button" onClick={logout}>
         Sair
       </button>
@@ -57,6 +59,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/voice"
+            element={
+              <ProtectedRoute>
+                <VoiceSettingsPage />
               </ProtectedRoute>
             }
           />
