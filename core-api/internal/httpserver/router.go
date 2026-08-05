@@ -60,6 +60,8 @@ func NewRouter(
 			r.Post("/{id}/attempts", attemptsHandler.Submit)
 			r.Get("/{id}/attempts", attemptsHandler.History)
 			r.Get("/{id}/reference-audio", ttsHandler.ReferenceAudio)
+			r.Post("/{id}/answer", exercisesHandler.Answer)
+			r.Post("/{id}/text-attempt", exercisesHandler.TextAttempt)
 		})
 
 		r.Route("/scenarios", func(r chi.Router) {
