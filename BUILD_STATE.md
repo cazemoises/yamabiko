@@ -1,9 +1,199 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
-Trabalho pós-MVP em andamento: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios).
+Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
+com preview — **CONCLUÍDO** (5/5 commits, ver "Última ação" abaixo). Sem trabalho pendente conhecido no
+momento; próxima sessão pode perguntar ao usuário o que priorizar em seguida (gamificação/SRS da Fase 6
+original ainda não tem UI no `web` apesar do backend existir — ver histórico).
 
-## Última ação
+## Última ação — sistema de seleção de voz com preview (5/5 commits, retomado de sessão interrompida)
+
+Sessão anterior parou no meio do commit 2/5 (`core-api/internal/tts/tts.go` editado generalizando
+`TTSClient.Synthesize` pra receber `providerVoiceID` por chamada, mas `voicevox_client.go`/`piper_client.go`
+ainda não atualizados — `go build ./...` quebrado). Retomado do zero seguindo exatamente o "Próximo passo
+imediato" documentado, e os 5 commits pedidos originalmente foram concluídos em sequência:
+
+1. **Curadoria VOICEVOX + Piper** (`98c2d3b`, já commitado antes da interrupção — não retrabalhado).
+2. **Backend `GET /tts/voices?language=` + `GET /tts/voices/{voice_id}/preview`**: `voicevox_client.go`/
+   `piper_client.go` corrigidos pra assinatura nova (`NewVoicevoxClient(baseURL)`/`NewPiperClient(address)`
+   sem voz fixa, `Synthesize(ctx, text, providerVoiceID)`). `tts.Service.GetReferenceAudio(ctx, exerciseID,
+   voiceID)` resolve o voice_id via `findVoice`/`DefaultVoiceID` (fail-open pro default do idioma em
+   voiceID vazio/desconhecido/de outro idioma), chave de cache virou
+   `exercises/{exercise_id}__{voice_id}.wav`. Novo `Service.GetVoicePreview(ctx, voiceID)` (frase curta
+   cacheada em `previews/{voice_id}.wav`, erro real `ErrVoiceNotFound` pra id desconhecido — sem fallback
+   aqui, diferente de GetReferenceAudio, porque não há texto de exercício nenhum pra cair em default).
+   `config.go`/`docker-compose.yml`: removidas `VOICEVOX_SPEAKER_ID`/`PIPER_VOICE` do `core-api` (a
+   curadoria mora no catálogo Go, `voice.go`, não em env var — env `PIPER_VOICE` do serviço `piper` em si,
+   arranque do container, continua existindo, é outra coisa). Verificado ao vivo via `docker compose`:
+   listagem filtra certo pros dois idiomas, preview cache miss ~5.4s / cache hit ~0.13s bytes idênticos,
+   WAV válido ja-JP e en-US, voice_id desconhecido devolve 404.
+3. **Preferência de usuário + `reference-audio` a usa**: migration `0015` (`users.preferred_voice_ja`/
+   `preferred_voice_en`, TEXT nullable, 2 colunas fixas). `tts.Service` ganhou interface
+   `PreferredVoiceLookup` (injetada via `NewService`, implementada por `users.PostgresRepository` — direção
+   de dependência users→tts, tts nunca importa users) e método `ReferenceAudioForUser(ctx, exerciseID,
+   userID)`, que resolve a preferência salva (fail-open em qualquer erro de lookup) e delega pra
+   `GetReferenceAudio`; `tts.Handler.ReferenceAudio` passou a exigir usuário autenticado e chamar esse
+   método em vez de `GetReferenceAudio` com voiceID fixo em `""`. `users.Profile` expõe
+   `preferred_voice_ja/en` (omitempty). `PATCH /users/me/voice-preference` (`{language, voice_id}`) valida
+   o voice_id contra `tts.VoicesForLanguage` antes de salvar; `voice_id=""` limpa a preferência. Verificado
+   ao vivo: PATCH com voice_id de idioma errado / language não suportado devolvem 400; PATCH válido reflete
+   em `GET /users/me`; 2ª chamada a `reference-audio` do mesmo exercício cacheia sob a chave da voz
+   preferida em vez do default; limpar a preferência remove o campo do perfil.
+4. **Frontend — tela "Escolher voz"**: `features/settings/VoiceSettingsPage.tsx` (rota `/settings/voice`,
+   link "Voz" na navbar) — toggle 🇯🇵/🇺🇸 (mesmo padrão de `ExercisesListPage`), lista as vozes do idioma via
+   `GET /tts/voices`, botão "▶ Ouvir" toca o preview via blob+`<audio>` (mesmo padrão de `SpeakButton`),
+   botão "Selecionar"/"✓ Selecionada" salva via `PATCH /users/me/voice-preference` com atualização otimista
+   do estado local (sem re-fetch do perfil inteiro). `lib/apiClient.ts` ganhou `api.patch` (só
+   get/post/getBlob existiam). Revisão visual manual (screenshot Playwright descartável) confirmou o layout
+   claro/escuro dentro da estética "Tactical Telemetry" já usada no resto do `web`.
+5. Este arquivo.
+
+**TDD**: `tts` ganhou testes novos pra resolução de voz/preview/`ReferenceAudioForUser`
+(fail-open coberto explicitamente) e um `handler_test.go` novo (não existia) cobrindo `Voices`/
+`VoicePreview` via `httptest`+chi. `web/e2e/voice-settings.spec.ts` cobre o fluxo completo da tela nova.
+`users` segue sem testes Go (mesmo padrão já estabelecido no repo pra esse pacote — verificado contra
+Postgres real via curl em vez de mocks).
+
+**Verificação final**: `go build`/`go vet`/`go test ./...` (core-api, `tts` com 33 testes) e `tsc -b`/
+`oxlint`/`playwright test` (web, 11/11 specs e2e) limpos em cada um dos 3 commits de código (2/5, 3/5,
+4/5). Stack completa (`docker compose up -d --build core-api`) testada ao vivo em cada etapa — migration
+`0015` aplicada limpa (`schema_migrations.version=15, dirty=false`).
+
+## ⚠️ SESSÃO INTERROMPIDA NO MEIO DO TRABALHO (histórico — já resolvida, ver "Última ação" acima)
+
+Contexto do pedido (pra quem chegar sem memória nenhuma desta sessão): o usuário pediu um **sistema de
+seleção de voz com preview, parametrizável por usuário, pra ja-JP e en-US**, com 4 partes + docs, cada
+uma em commit separado:
+1. Curadoria VOICEVOX (6-8 speakers, não os 43 crus) + baixar mais 2 modelos Piper en-US.
+2. Backend: `GET /tts/voices?language=` + `GET /tts/voices/{voice_id}/preview` (cacheado por voice_id).
+3. Backend: `users.preferred_voice_ja`/`preferred_voice_en` + `GET /exercises/{id}/reference-audio` passa
+   a usar a voz preferida do usuário (fallback pro default), cache agora incluindo voice_id.
+4. Frontend: tela/modal "Escolher voz" com preview por voz + marcação da selecionada, salva via
+   `PATCH /users/me/voice-preference` (ou similar).
+5. `BUILD_STATE.md` (este arquivo).
+
+### Estado exato do git agora (confirmar com `git status` / `git diff` antes de continuar)
+
+```
+On branch master
+Changes not staged for commit:
+	modified:   core-api/internal/tts/tts.go
+Untracked files:
+	mic_test.py       <- NÃO é deste trabalho, arquivo de laboratório histórico (Sec. 0 do CLAUDE.md), ignorar
+	transcribe.py      <- idem
+```
+
+Nenhum outro arquivo tem mudança pendente — tudo o resto já está commitado (ver `git log --oneline -5`).
+**Não há nada sujo além de `core-api/internal/tts/tts.go`.** Antes de continuar, rode `git status` de novo
+pra confirmar que isso ainda bate (ninguém deveria ter mexido no repo entre esta sessão e a próxima).
+
+### Commit 1/5 (curadoria + download) — CONCLUÍDO e commitado
+Commit `98c2d3b` — `core-api/internal/tts/voice.go` (catálogo: 7 vozes ja-JP incluindo o default
+`speaker=30`/`ja-announcer-neutral`, 3 vozes en-US incluindo o default `en_US-lessac-medium`/`en-lessac`),
+`voice_test.go` (8 testes, todos passando), 2 modelos Piper novos (`en_US-amy-medium`, `en_US-ryan-medium`)
+já baixados e persistidos no volume `piper-voices` (verificado via requisição Wyoming direta), comentário
+em `docker-compose.yml` documentando os 3 modelos. **Esta parte está pronta, não precisa retrabalho.**
+
+### Commit 2/5 (backend voices/preview) — EM ANDAMENTO, QUEBRADO NO MEIO
+
+**O bloqueio exato**: `core-api/internal/tts/tts.go` foi editado pra generalizar a interface `TTSClient`
+(pra aceitar um `providerVoiceID` por chamada, em vez de cada client já vir com uma voz fixa — necessário
+pra `Service` poder pedir vozes diferentes ao mesmo VOICEVOX/Piper conforme a preferência do usuário), mas
+**nenhum dos implementadores foi atualizado ainda**. Isso quebra a build inteira do pacote `tts` e de
+`cmd/api`. `go build ./...` nesse estado falha.
+
+- **Assinatura antiga** (ainda em uso por todo mundo, exceto a interface): `Synthesize(ctx context.Context,
+  text string) ([]byte, error)`.
+- **Assinatura nova** (só a interface em `tts.go` tem, linha 13):
+  `Synthesize(ctx context.Context, text, providerVoiceID string) ([]byte, error)`.
+
+**Arquivos que ainda implementam/chamam a assinatura ANTIGA e precisam mudar pra NOVA:**
+
+1. **`core-api/internal/tts/voicevox_client.go`** — `VoicevoxClient` ainda tem um campo `speakerID`
+   fixado no struct (setado 1x em `NewVoicevoxClient(baseURL, speakerID string)`, linhas 12-20) e
+   `Synthesize` (linha 27) usa `c.speakerID` internamente em vez de receber a voz por parâmetro. Precisa:
+   remover o campo `speakerID` do struct, `NewVoicevoxClient` passa a receber só `baseURL`, `Synthesize`
+   ganha o 3º parâmetro `providerVoiceID string` e usa ele (não mais `c.speakerID`) nas chamadas internas
+   pra `/audio_query` e `/synthesis` (que hoje usam `c.speakerID` nos `url.Values`).
+2. **`core-api/internal/tts/piper_client.go`** — mesmo padrão: `PiperClient` tem campo `voice` fixado
+   (linhas 24-32, setado via `NewPiperClient(address, voice string)`), `Synthesize` (linha 34) e
+   `sendSynthesize` (linha 57, usa `c.voice` pra montar o campo `"voice"` da mensagem Wyoming) precisam
+   trocar pra receber `providerVoiceID` por parâmetro em vez de campo do struct. `NewPiperClient` passa a
+   receber só `address`.
+3. **`core-api/internal/tts/service.go`** — linha 59: `client.Synthesize(ctx, exercise.ExpectedTranscript)`
+   precisa virar `client.Synthesize(ctx, exercise.ExpectedTranscript, providerVoiceID)` — mas isso é só
+   metade do trabalho: `Service.GetReferenceAudio` **ainda não foi redesenhado** pra aceitar um `voiceID`
+   (id do catálogo, não o providerVoiceID cru), resolver via `tts.findVoice(voiceID)` (já existe em
+   `voice.go` mas está **sem uso** ainda — `unusedfunc` no lint), cair no `tts.DefaultVoiceID(language)`
+   quando `voiceID==""`, e trocar a chave de cache de `{exercise_id}.wav` pra algo tipo
+   `exercises/{exercise_id}__{voice_id}.wav` (Sec. pedida pelo usuário: "chave de cache agora inclui
+   voice_id"). Isso NÃO foi feito ainda — só o `tts.go` foi tocado antes da sessão cair.
+4. **`core-api/internal/tts/service_test.go`** — `fakeTTSClient.Synthesize` (linha 21) tem a assinatura
+   antiga; toda construção de `map[string]tts.TTSClient{...}` no arquivo (linhas 45, 73, 100, 125, 140,
+   167, 179) vai quebrar até o fake ser atualizado. **Os testes atuais também precisam ser reescritos**
+   pra refletir a nova assinatura de `GetReferenceAudio` (com voiceID) uma vez que ela existir — não dá só
+   pra consertar a assinatura do fake e manter os testes como estão, porque `GetReferenceAudio(ctx,
+   exerciseID)` (2 args) vai virar `GetReferenceAudio(ctx, exerciseID, voiceID)` (3 args, ver item 3).
+5. **`core-api/internal/tts/voicevox_client_test.go`** e **`piper_client_test.go`** — todas as chamadas
+   `client.Synthesize(ctx, "texto")` (2 args) precisam virar `client.Synthesize(ctx, "texto",
+   "<speaker-ou-voice-de-teste>")` (3 args).
+6. **`core-api/cmd/api/main.go`** (linhas 61-64) — `tts.NewVoicevoxClient(cfg.VoicevoxURL,
+   cfg.VoicevoxSpeakerID)` e `tts.NewPiperClient(cfg.PiperAddress, cfg.PiperVoice)` precisam virar
+   `tts.NewVoicevoxClient(cfg.VoicevoxURL)` e `tts.NewPiperClient(cfg.PiperAddress)` (sem mais
+   speakerID/voice fixos — a voz agora é por request). `tts.NewService(ttsClients, exercisesRepo,
+   cfg.AudioCacheDir)` também vai precisar de mais um argumento quando o preference-lookup for adicionado
+   (isso é trabalho do commit 3/5, não precisa antecipar agora, só não se surpreender depois).
+7. **`core-api/internal/config/config.go`** — `cfg.VoicevoxSpeakerID` e `cfg.PiperVoice` deixam de ter
+   sentido pro core-api (a curadoria agora mora no catálogo Go, não em env var) — decisão já tomada
+   mentalmente antes da interrupção: **remover** `VOICEVOX_SPEAKER_ID`/`PIPER_VOICE` de `config.go` (campo
+   do struct + leitura da env var) e do bloco `environment:` do serviço `core-api` em `docker-compose.yml`
+   (a env var `PIPER_VOICE` do serviço **`piper`** em si continua existindo — é o `--voice` de arranque do
+   container, coisa diferente). **Isso ainda não foi feito** — nem `config.go` nem o `docker-compose.yml`
+   do serviço `core-api` foram tocados nesta etapa.
+
+**Depois de ajustar 1-7, faltam ainda pra fechar o commit 2/5** (não foi começado):
+- `handler.go`: novos handlers `Voices(w,r)` (`GET /tts/voices?language=` → `tts.VoicesForLanguage`) e
+  `VoicePreview(w,r)` (`GET /tts/voices/{voice_id}/preview` → `service.GetVoicePreview(ctx, voiceID)`,
+  método que também não existe ainda em `service.go`). `ReferenceAudio` existente deve continuar
+  funcionando chamando `GetReferenceAudio(ctx, id, "")` (string vazia = usa o default do idioma — a
+  resolução de preferência de usuário real é só no commit 3/5).
+- `router.go`: registrar `GET /tts/voices` e `GET /tts/voices/{voice_id}/preview` dentro do grupo
+  autenticado (mesmo padrão de `/exercises`).
+- Verificação ao vivo (padrão já estabelecido nesta sessão): `docker compose up -d --build core-api`,
+  depois `curl` em `/tts/voices?language=ja-JP` e `/tts/voices/{id}/preview`, conferir cache em
+  `audio-cache/previews/` (ou onde a Service decidir cachear preview).
+- `go build ./...`, `go vet ./...`, `go test ./...` **inteiros passando** antes de commitar — nesse
+  momento eles NÃO passam (ver bloqueio acima).
+
+### Commits 3, 4 e 5 — NÃO INICIADOS
+Nenhum arquivo de `users/` foi tocado ainda (sem migration nova, sem `preferred_voice_ja/en`, sem
+`PATCH /users/me/voice-preference`). Nenhum arquivo em `web/` foi tocado ainda (sem tela/modal de escolher
+voz, sem chamada a `/tts/voices`, sem `SpeakButton` ou qualquer componente novo pra isso). Design mental já
+decidido (documentado aqui pra não se perder, mas **nada disso está em código**):
+- `tts.Service` vai precisar de uma interface `PreferredVoiceLookup` (`GetVoicePreference(ctx, userID,
+  language) (voiceID string, err error)`) injetada via `NewService(...)`, implementada por
+  `users.PostgresRepository` (método novo, sem interpolar nome de coluna dinamicamente — 2 colunas fixas,
+  `SELECT` as duas e escolhe em Go qual devolver pelo idioma). Qualquer erro na busca de preferência deve
+  cair pro default (fail-open), não derrubar o endpoint de áudio inteiro.
+- `users.Profile` ganha `PreferredVoiceJA`/`PreferredVoiceEN *string` (omitempty) pra o frontend saber qual
+  voz já está selecionada sem outra requisição.
+- Validação do `voice_id` recebido em `PATCH /users/me/voice-preference` contra `tts.VoicesForLanguage`
+  (import `users` -> `tts`, sem ciclo, mesma direção de dependência já usada em outros pacotes deste repo).
+- Frontend: tela/modal nova (ainda sem nome de arquivo decidido), acessível do dashboard, listando vozes
+  do idioma atual com botão de play tocando o preview (mesmo padrão de blob+`<audio>` que `SpeakButton` já
+  usa pra `reference-audio`), marcação clara da voz selecionada, salva via PATCH.
+- Testes pedidos e ainda não escritos: listagem de vozes por idioma (parcialmente coberta por
+  `voice_test.go`, mas falta o teste do HANDLER HTTP), preview retorna áudio válido e cacheado (padrão dos
+  testes de cache já existentes em `service_test.go` pra `GetReferenceAudio`), reference-audio respeita a
+  preferência salva (novo, depende do commit 3/5 existir).
+
+## Próximo passo imediato (histórico — já executado, ver "Última ação" no topo do arquivo)
+
+~~Abrir `core-api/internal/tts/voicevox_client.go` e `core-api/internal/tts/piper_client.go` e aplicar a
+mudança de assinatura descrita nos itens 1 e 2 acima~~ — feito, seguido pela lista 3-7 e pelos commits 3/5
+e 4/5, todos concluídos nesta sessão de retomada.
+
+## Última ação (importação do seed pilot de scenarios — histórico)
 **Importação de `japanese_scenarios_pilot.json` (3 cenários ja-JP)** — pedido de follow-up do usuário, na
 sequência do modelo de scenarios (ver histórico abaixo).
 
