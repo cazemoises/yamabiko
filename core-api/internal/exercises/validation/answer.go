@@ -70,6 +70,8 @@ func ValidateAnswer(exerciseType string, typeData json.RawMessage, req AnswerReq
 		return validateWordOrder(typeData, req)
 	case "verb_conjugation":
 		return validateVerbConjugation(typeData, req)
+	case "matching_pairs":
+		return validateMatchingPairs(typeData, req)
 	default:
 		return AnswerResult{}, ErrUnsupportedType
 	}
