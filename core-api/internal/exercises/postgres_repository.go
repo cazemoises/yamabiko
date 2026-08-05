@@ -2,6 +2,7 @@ package exercises
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,7 +21,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 }
 
 func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercise, error) {
-	query := `SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario FROM exercises`
+	query := `SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario, exercise_type, type_data FROM exercises`
 
 	var conditions []string
 	var args []any
@@ -75,7 +76,7 @@ func (r *PostgresRepository) List(ctx context.Context, filter Filter) ([]Exercis
 
 func (r *PostgresRepository) FindByID(ctx context.Context, id uuid.UUID) (*Exercise, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario
+		`SELECT id, category, difficulty, prompt_pt, expected_transcript, expected_romaji, sprint_day_ref, language, scenario_id, order_in_scenario, exercise_type, type_data
 		 FROM exercises WHERE id = $1`,
 		id,
 	)
@@ -96,15 +97,19 @@ type rowScanner interface {
 func scanExercise(row rowScanner) (Exercise, error) {
 	var e Exercise
 	var romaji *string
+	var typeData []byte
 	err := row.Scan(
 		&e.ID, &e.Category, &e.Difficulty, &e.PromptPT, &e.ExpectedTranscript, &romaji, &e.SprintDayRef, &e.Language,
-		&e.ScenarioID, &e.OrderInScenario,
+		&e.ScenarioID, &e.OrderInScenario, &e.ExerciseType, &typeData,
 	)
 	if err != nil {
 		return Exercise{}, err
 	}
 	if romaji != nil {
 		e.ExpectedRomaji = *romaji
+	}
+	if typeData != nil {
+		e.TypeData = json.RawMessage(typeData)
 	}
 	return e, nil
 }
