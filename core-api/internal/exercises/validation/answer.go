@@ -66,6 +66,8 @@ func ValidateAnswer(exerciseType string, typeData json.RawMessage, req AnswerReq
 	switch exerciseType {
 	case "multiple_choice_translation":
 		return validateMultipleChoiceTranslation(typeData, req)
+	case "word_order":
+		return validateWordOrder(typeData, req)
 	default:
 		return AnswerResult{}, ErrUnsupportedType
 	}
