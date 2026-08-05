@@ -27,19 +27,22 @@ services:
   # modelo por nome via o campo "voice" da mensagem Wyoming (confirmado no
   # código-fonte de wyoming_piper: cada synthesize resolve a voz pedida e
   # baixa sob demanda se ainda não estiver em /config, cacheando pro resto da
-  # vida do volume). 3 modelos curados (curadoria pedida pelo usuário, ver
-  # core-api/internal/tts/voice.go e BUILD_STATE.md), todos já baixados e
-  # persistidos no volume piper-voices nesta sessão:
-  #   - en_US-lessac-medium: voz masculina neutra (default, já em uso)
-  #   - en_US-amy-medium: voz feminina
-  #   - en_US-ryan-medium: voz masculina jovem, timbre distinto do lessac
+  # vida do volume). 3 modelos curados, todos em qualidade "high" (curadoria
+  # pedida pelo usuário, ver core-api/internal/tts/voice.go e
+  # BUILD_STATE.md — trocados de "medium" pra "high" porque a qualidade
+  # perceptível ficava nitidamente abaixo do VOICEVOX; trade-off de latência
+  # documentado em BUILD_STATE.md):
+  #   - en_US-lessac-high: voz masculina neutra (default, já em uso)
+  #   - en_US-ryan-high: voz masculina jovem, timbre distinto do lessac
+  #   - en_US-ljspeech-high: voz feminina (substitui a antiga en_US-amy-medium
+  #     — amy não tem tier "high" no repositório oficial do Piper)
   # Volume próprio pros modelos baixados persistirem entre restarts, mesmo
   # padrão do whisper-models. Sem `ports:` — só o core-api fala com ele, fica
   # só na rede interna do compose.
   piper:
     image: lscr.io/linuxserver/piper:latest
     environment:
-      - PIPER_VOICE=en_US-lessac-medium
+      - PIPER_VOICE=en_US-lessac-high
     volumes:
       - piper-voices:/config
     expose:

@@ -31,7 +31,7 @@ const JA_VOICES = [
 
 const EN_VOICES = [
   { id: "en-lessac", name: "Lessac (voz masculina neutra)", language: "en-US" },
-  { id: "en-amy", name: "Amy (voz feminina)", language: "en-US" },
+  { id: "en-ljspeech", name: "LJSpeech (voz feminina)", language: "en-US" },
 ];
 
 test("seletor de voz: mostra a preferência salva, toca preview, e salva nova seleção", async ({ page }) => {
@@ -103,6 +103,6 @@ test("seletor de voz: mostra a preferência salva, toca preview, e salva nova se
   // Trocar de idioma troca a lista pro catálogo en-US.
   await page.getByRole("button", { name: "🇺🇸 Inglês" }).click();
   await expect(page.getByText("Lessac (voz masculina neutra)")).toBeVisible();
-  await expect(page.getByText("Amy (voz feminina)")).toBeVisible();
+  await expect(page.getByText("LJSpeech (voz feminina)")).toBeVisible();
   await expect(page.getByText("Locutor(a) Neutro(a)")).not.toBeVisible();
 });

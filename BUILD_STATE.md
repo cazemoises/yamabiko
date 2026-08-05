@@ -2,11 +2,93 @@
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
-com preview — **CONCLUÍDO** (5/5 commits, ver "Última ação" abaixo). Sem trabalho pendente conhecido no
-momento; próxima sessão pode perguntar ao usuário o que priorizar em seguida (gamificação/SRS da Fase 6
-original ainda não tem UI no `web` apesar do backend existir — ver histórico).
+com preview + **catálogo de vozes ampliado** — **CONCLUÍDO** (ver "Última ação" abaixo). Sem trabalho
+pendente conhecido no momento; próxima sessão pode perguntar ao usuário o que priorizar em seguida
+(gamificação/SRS da Fase 6 original ainda não tem UI no `web` apesar do backend existir — ver histórico).
 
-## Última ação — sistema de seleção de voz com preview (5/5 commits, retomado de sessão interrompida)
+## Última ação — catálogo de vozes ampliado (VOICEVOX +8, Piper trocado pra "high" quality)
+
+Pedido do usuário: ampliar a curadoria de vozes de `GET /tts/voices` — mais 8-10 speakers VOICEVOX
+(gênero/tom/idade variados) e mais modelos Piper en-US com timbres distintos. No meio da execução, o
+usuário interrompeu pra redirecionar a parte do Piper: em vez de simplesmente somar modelos "medium" novos,
+pediu pra **trocar os 3 modelos en-US existentes por versões "high" quality**, porque a qualidade
+perceptível estava nitidamente abaixo do VOICEVOX — atendido como pedido, com teste de latência/qualidade
+real em vez de só "buildou sem erro".
+
+### 1. Curadoria VOICEVOX (7 → 15 vozes ja-JP)
+- Levantamento via `GET /speakers` (43 personagens, 127 estilos) contra a instância real do VOICEVOX.
+  Pra cada candidato, o timbre/gênero/idade percebida foi **verificado contra a página oficial de produto
+  de cada personagem** (`voicevox.hiroshiba.jp/product/...`) em vez de adivinhado pelo nome — evitou pelo
+  menos 1 erro (`ちび式じい`, cujo nome sugere voz de velho mas a ficha oficial não confirmou isso a tempo,
+  então foi descartado da curadoria por falta de fonte confiável, preferindo 栗田まろん no lugar).
+- 8 speakers novos adicionados a `core-api/internal/tts/voice.go` (todos estilo `ノーマル`, todos com fonte
+  oficial confirmada do timbre):
+  - `ja-female-young` (四国めたん, id=2) — "voz jovem, brilhante e enérgica"
+  - `ja-female-soft` (冥鳴ひまり, id=14) — "voz suave e calorosa"
+  - `ja-female-elegant` (九州そら, id=16) — "voz elegante e madura de adulto"
+  - `ja-female-low` (WhiteCUL, id=23) — "voz agradável e franca", timbre composto/maduro — cobre o gap de
+    voz feminina mais grave pedido pelo usuário
+  - `ja-female-bright` (春歌ナナ, id=54) — "voz vibrante e poderosa", jovem/aguda
+  - `ja-male-calm` (剣崎雌雄, id=21) — "voz tranquila e confortável", adulto
+  - `ja-male-elderly` (麒ヶ島宗麟, id=53) — "voz rouca de homem maduro/idoso" — única voz idosa do catálogo,
+    cobre o gap de idade perceptível pedido
+  - `ja-neutral-deep` (栗田まろん, id=67) — "voz neutra com profundidade", andrógina — timbre que não se
+    encaixa nem em "masculino" nem "feminino" de propósito, variedade que as 14 outras vozes não cobriam
+- Testado ao vivo: `GET /tts/voices?language=ja-JP` devolve as 15, `GET /tts/voices/{id}/preview` sintetiza
+  e cacheia áudio válido pras 3 vozes mais novas checadas (`ja-female-bright`, `ja-male-elderly`,
+  `ja-neutral-deep`) — WAV válido, 24kHz mono 16-bit, 2.3-2.7s de duração pra frase de preview padrão.
+
+### 2. Piper en-US: trocado de "medium" pra "high" quality (pedido de redirecionamento no meio da sessão)
+- **Descoberta antes de agir**: o repositório oficial de vozes do Piper só tem **3 modelos en-US de
+  locutor único em tier "high"** — `en_US-lessac-high`, `en_US-ryan-high`, `en_US-ljspeech-high` (os demais
+  candidatos considerados pro pedido original — amy, danny, norman, kathleen, kristin, joe — só existem em
+  low/medium, sem tier high). Confirmado navegando a árvore de cada voz em
+  `huggingface.co/rhasspy/piper-voices` antes de escolher, não assumido. Por isso o catálogo en-US
+  **manteve 3 vozes** (não somou pra 5-6 como o pedido original pedia) — `en-amy` foi removida e
+  substituída por `en-ljspeech` (voz feminina clássica do dataset LJSpeech), `en-lessac`/`en-ryan`
+  mantiveram o `id` do catálogo mas trocaram o `providerVoiceID` interno pra `-high`.
+- **`docker-compose.yml`**: `PIPER_VOICE` (voz de arranque) trocada de `en_US-lessac-medium` pra
+  `en_US-lessac-high`. Comentário do serviço `piper` atualizado documentando os 3 modelos high e o motivo
+  da troca.
+- **Cache invalidado**: os arquivos antigos em `audio-cache/previews/` gerados com os modelos medium
+  (`en-lessac.wav`, `en-ryan.wav`, `en-amy.wav`) foram apagados manualmente do volume — a chave de cache é
+  só `voice_id` (não inclui hash do modelo), então sem isso o endpoint continuaria servindo áudio "medium"
+  antigo pros ids `en-lessac`/`en-ryan` mesmo depois da troca. Os `.onnx` medium antigos (`en_US-amy-medium`,
+  `en_US-lessac-medium`, `en_US-ryan-medium`, ~63MB cada) também foram removidos do volume `piper-voices`
+  (nada mais os referencia).
+- **Verificação real de qualidade e trade-off de latência** (não só "buildou sem erro"): com os 3 modelos
+  high já baixados no volume, tempo de síntese pura (cache miss, sem contar download) medido via
+  `GET /tts/voices/{id}/preview`:
+  - `en-lessac-high`: ~1.2s (default, já estava sendo baixado no boot do container)
+  - `en-ryan-high`: ~1.2s
+  - `en-ljspeech-high`: ~1.9s
+  Isso é **~1.1-1.8x mais lento** que os ~1.08s medidos pra Piper medium na sessão anterior (ver histórico
+  "Piper TTS + generalização tts/" abaixo) — trade-off aceito pelo usuário. Os `.onnx` high pesam
+  ~114-121MB (vs ~63MB medium), quase o dobro em disco/download inicial (o download só acontece 1x por
+  modelo, cacheado no volume `piper-voices` depois). Áudio resultante confirmado como WAV válido (22050Hz
+  mono 16-bit, 1.4-1.7s de duração pra frase de preview), bytes diferentes do cache antigo (prova de que
+  não é o mesmo áudio medium servido de novo), e cache hit subsequente ~100ms (cache funcionando igual
+  antes).
+  - **Limitação honesta**: a verificação acima é toda programática (validade de WAV, tamanho, latência,
+    diferença de bytes contra o áudio antigo) — nenhuma escuta humana/real do áudio foi feita nesta sessão
+    (sem capacidade de reprodução de áudio disponível). Recomendado ao usuário confirmar auditivamente a
+    melhora de qualidade percebida antes de considerar o débito "qualidade perceptível abaixo do VOICEVOX"
+    totalmente resolvido.
+- `web/e2e/voice-settings.spec.ts`: fixture do teste atualizada (`en-amy` → `en-ljspeech`) pra não ficar
+  referenciando uma voz que não existe mais no catálogo real (o teste mocka o endpoint, então não quebraria
+  sem isso, mas ficaria com dado de fixture inconsistente com a API real).
+
+### Testes
+`core-api/internal/tts/voice_test.go`: `TestVoicesForLanguage_JapaneseReturnsCuratedSubsetNotRawSpeakers`
+teve a faixa esperada ajustada de 6-8 pra 12-20 (15 vozes reais, ainda bem abaixo dos 43 speakers crus —
+o teste continua validando "é uma curadoria, não a lista inteira", só com o número atualizado).
+`TestVoicesForLanguage_EnglishReturnsAtLeastThreeVoices` comentário atualizado (não fala mais de "2 novas
+baixadas", já que o Piper não ganhou vozes novas nesta rodada, só trocou de tier).
+
+`go build`/`go vet`/`go test ./...` (core-api, pacote `tts`) e `tsc -b`/`oxlint`/`playwright test` (web,
+11/11 specs e2e) limpos. Stack completa testada ao vivo via `docker compose up -d --build core-api piper`.
+
+## Última ação (histórico — sistema de seleção de voz com preview, 5/5 commits)
 
 Sessão anterior parou no meio do commit 2/5 (`core-api/internal/tts/tts.go` editado generalizando
 `TTSClient.Synthesize` pra receber `providerVoiceID` por chamada, mas `voicevox_client.go`/`piper_client.go`

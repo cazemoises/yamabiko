@@ -9,8 +9,8 @@ import (
 func TestVoicesForLanguage_JapaneseReturnsCuratedSubsetNotRawSpeakers(t *testing.T) {
 	voices := tts.VoicesForLanguage("ja-JP")
 
-	if len(voices) < 6 || len(voices) > 8 {
-		t.Fatalf("esperava entre 6 e 8 vozes curadas pra ja-JP, veio %d", len(voices))
+	if len(voices) < 12 || len(voices) > 20 {
+		t.Fatalf("esperava entre 12 e 20 vozes curadas pra ja-JP (bem menos que os 43 speakers crus), veio %d", len(voices))
 	}
 	for _, v := range voices {
 		if v.Language != "ja-JP" {
@@ -34,8 +34,10 @@ func TestVoicesForLanguage_MatchesByPrimarySubtag(t *testing.T) {
 func TestVoicesForLanguage_EnglishReturnsAtLeastThreeVoices(t *testing.T) {
 	voices := tts.VoicesForLanguage("en-US")
 
+	// Só 3 porque é o total de vozes en-US de locutor único em qualidade
+	// "high" disponíveis no repositório oficial do Piper (lessac/ryan/ljspeech).
 	if len(voices) < 3 {
-		t.Fatalf("esperava pelo menos 3 vozes en-US (lessac + 2 novas baixadas), veio %d", len(voices))
+		t.Fatalf("esperava pelo menos 3 vozes en-US, veio %d", len(voices))
 	}
 	for _, v := range voices {
 		if v.Language != "en-US" {
