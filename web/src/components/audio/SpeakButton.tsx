@@ -5,6 +5,11 @@ interface SpeakButtonProps {
   exerciseId: string;
   label?: string;
   className?: string;
+  /** Troca a classe base "speak-button" por outra — usado quando o botão
+   * de ouvir pronúncia precisa de um visual totalmente diferente (ex: o
+   * círculo grande de play do Frame 12/ditado) em vez de só adicionar um
+   * modificador em cima do botão retangular padrão. */
+  baseClassName?: string;
 }
 
 // Toca o áudio de referência real do exercício — GET
@@ -14,7 +19,12 @@ interface SpeakButtonProps {
 // pra ja-JP, depois generalizado pra en-US também), cuja qualidade e
 // disponibilidade de voz variavam demais entre alunos e sistemas (débito
 // documentado em BUILD_STATE.md).
-export function SpeakButton({ exerciseId, label = "🔊 Ouvir pronúncia esperada", className }: SpeakButtonProps) {
+export function SpeakButton({
+  exerciseId,
+  label = "🔊 Ouvir pronúncia esperada",
+  className,
+  baseClassName = "speak-button",
+}: SpeakButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -52,7 +62,7 @@ export function SpeakButton({ exerciseId, label = "🔊 Ouvir pronúncia esperad
     <>
       <button
         type="button"
-        className={className ? `speak-button ${className}` : "speak-button"}
+        className={className ? `${baseClassName} ${className}` : baseClassName}
         onClick={speak}
         disabled={loading}
         title={error ?? undefined}

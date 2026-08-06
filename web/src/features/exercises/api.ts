@@ -124,6 +124,11 @@ export function submitAnswer(exerciseId: string, req: AnswerRequest): Promise<An
 
 export interface TextAttemptResult {
   transcript: string;
+  // Texto contra o qual o backend de fato comparou — pra dictation é
+  // sempre exercise.expected_transcript, pra free_translation é qual das
+  // várias acceptable_answers teve o melhor score (o cliente não tem como
+  // saber isso sozinho, só type_data.acceptable_answers com todas as opções).
+  expected: string;
   score: number;
   verdict: Verdict;
   diff: DiffEntry[];

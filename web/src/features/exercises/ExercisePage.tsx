@@ -8,6 +8,8 @@ import { WordOrderExercise } from "./WordOrderExercise";
 import { VerbConjugationExercise } from "./VerbConjugationExercise";
 import { TrueFalseExercise } from "./TrueFalseExercise";
 import { MatchingPairsExercise } from "./MatchingPairsExercise";
+import { DictationExercise } from "./DictationExercise";
+import { FreeTranslationExercise } from "./FreeTranslationExercise";
 import { TopBar } from "../../components/layout/TopBar";
 
 // Shell compartilhado por todo exercise_type (Frames 4-19): topbar,
@@ -138,6 +140,10 @@ function ExerciseBody({
       return <TrueFalseExercise exercise={exercise} onAnswered={onAnswered} />;
     case "matching_pairs":
       return <MatchingPairsExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "dictation":
+      return <DictationExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "free_translation":
+      return <FreeTranslationExercise exercise={exercise} onAnswered={onAnswered} />;
     case "audio_pronunciation":
     case undefined:
       return (
