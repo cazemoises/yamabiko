@@ -3,13 +3,109 @@
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
 com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
-(FASE A) — **CONCLUÍDO**. **EM ANDAMENTO: FASE B — import do design `Yamabiko.dc.html` e substituição do
-frontend.** Progresso da FASE B até agora (11 commits): design importado (tokens/shell/nav), os 8
-exercise_type integrados com resultado real (áudio + 7 novos da Fase A), configurações de voz e progresso
-reskinados. **Faltam**: layout desktop (sidebar), persistência de tema/accent color, e2e por tipo em
-mobile+desktop. Ver "Última ação" abaixo pro detalhe de cada commit e o próximo passo exato.
+(FASE A) + import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via
+LAN em dev — **TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário
+o que priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos
+novos de exercício não persistem tentativa — decisão de escopo documentada abaixo, revisitável). Ver
+"Última ação" pro detalhe completo da FASE B (17 commits) e as decisões tomadas.
 
-## Última ação — acesso via LAN pro `web`/`core-api` (pedido de follow-up, fora da FASE B)
+## Última ação — FASE B concluída: design importado, 8 exercise_type, desktop, tema/accent (17 commits)
+
+Pedido do usuário (mesma mensagem da FASE A, "duas fases, nessa ordem, sem pausar entre elas"): importar o
+design `Yamabiko.dc.html` (claude.ai/design, projeto `c66cb199-1083-4b66-8d10-ec8fc60be837`, 19 frames
+mobile 390x844 + `support.js`) via `claude_design` MCP e substituir o frontend React existente,
+reaproveitando toda a lógica de API já existente, com layout desktop e persistência de tema/accent color.
+Executado em 17 commits atômicos + 1 pedido de follow-up (acesso via LAN, fora do escopo da FASE B mas
+tratado na mesma sessão — ver seção própria mais abaixo por ordem cronológica).
+
+### Import do design — achados antes de codificar
+`DesignSync` (list_projects/get_project/list_files/get_file) confirmou o projeto como `PROJECT_TYPE_PROJECT`
+(não `DESIGN_SYSTEM` — por isso não aparece em `list_projects`, só acessível via `get_project` direto pelo
+ID). Os 19 frames (confirmados via grep de marcadores `<!-- FRAME N: ... -->`, não pela introdução do
+documento, que estava desatualizada dizendo "7 telas"): Home claro/escuro, Lista de Cenários, Fluxo de
+Cenário, Resultado da Tentativa (áudio), Exercícios avulsos, Progresso, Configurações de Voz, os 7
+exercícios novos da Fase A (múltipla escolha, ordenação de frase, conjugação verbal, ditado, tradução
+livre, combinar pares, verdadeiro/falso), Resultado binário (acerto/erro) e Resultado texto livre
+(acerto/erro). O script embutido no `.dc.html` (`renderVals()`) revelou a fórmula exata dos tokens
+derivados do acento (`accentSoft`/`accentText`/`accentRing` via `color-mix()`) e as 4 opções de acento do
+Tweaks panel (mono `#23201B`, verde-água `#2F9E8F`, terracota `#C1662F` default, âmbar `#B98A2E`, + hex
+customizado) — reaproveitados 1:1 no sistema real.
+
+### Os 17 commits (ordem cronológica)
+1. **Import do design** — tokens CSS (light/dark via `data-theme` + `@media prefers-color-scheme`, acento
+   configurável via `--accent-base`/`color-mix()`, "mono" tratado como caso especial relativo ao tema —
+   `var(--text)`, não um hex fixo, senão desapareceria no escuro), fontes (Inter + Noto Sans JP), AppShell
+   (bottom nav mobile), HomePage/ScenariosListPage/ScenarioPage novos (progresso real via
+   `GET /scenarios` + `GET /scenarios/{id}` + `GET /exercises/{id}/attempts` — **limitação documentada**:
+   só reflete `attempts` de `audio_pronunciation`, os 7 tipos novos não persistem tentativa, ver decisão de
+   escopo abaixo), ExercisesListPage reskinada (Frame 6, só exercícios sem `scenario_id`).
+2. **audio_pronunciation** (Frames 4/5) — ExercisePage virou o shell compartilhado por todo `exercise_type`
+   (topbar, contexto de cenário, rodapé Próximo/Tentar-de-novo/cenário-concluído), delegando pergunta+
+   resposta+feedback pro componente do tipo via `onAnswered(correct)`. `AudioRecorder` ganhou `autoStart`
+   (retry remonta com `key`, não mais lógica própria de retry). `DiffComparison` virou só o card
+   "Esperado/Você disse" (perdeu o `SpeakButton` inline, que virou botão próprio no rodapé).
+3. **multiple_choice_translation** (Frames 9/16/17) — mesma lista de opções ganha cor ao responder
+   (certa=verde+check, errada=vermelha+x, resto apagado), sem trocar de tela. **Bug pego e corrigido**: o
+   `ExerciseBody` só remontava por `resetKey` (0 tanto no 1º exercício quanto ao trocar de exercício de
+   cenário) — estado do tipo anterior vazava pro próximo exercício. Corrigido incluindo `exercise.id` na
+   `key`.
+4. **word_order** (Frame 10) — toca banco de palavras pra colocar/devolver, submete sozinho quando o banco
+   esvazia (sem botão de confirmar).
+5. **verb_conjugation** (Frame 11/17) — reusa o núcleo de `multiple_choice_translation`, prompt com
+   sentence_template + blank colorido.
+6. **true_false + matching_pairs** (Frames 14/15, commitados juntos por terem sido implementados na mesma
+   sessão de edição de arquivos compartilhados) — `matching_pairs` embaralha a coluna direita com uma seed
+   determinística (`exercise.id`), sem isso "combinar" seria só clicar na mesma linha dos dois lados (o
+   backend manda os pares já alinhados 1:1).
+7. **fix de backend**: `POST /text-attempt` não dizia contra QUAL `acceptable_answers` o diff foi
+   calculado — achado integrando `free_translation` (o frontend não tem como adivinhar sozinho qual das
+   várias respostas aceitas o backend usou). `validation.ValidateFreeTranslation` ganhou um 2º retorno
+   (`matchedAnswer`), resposta de `/text-attempt` ganhou o campo `expected`.
+8. **dictation + free_translation** (Frames 12/13/18/19) — `TextResultView` novo (análogo a
+   `AudioResultView`), `SpeakButton` ganhou `baseClassName` (troca a classe base inteira em vez de só
+   empilhar modificador, pro círculo grande de play do ditado).
+9. **Configurações de voz** (Frame 8) — indicador de seleção virou círculo com check (não mais texto
+   "✓ Selecionada"/"Selecionar"), toggle Japonês/Inglês em pílulas. O subtítulo "Feminina · tom claro" do
+   mock foi omitido (o catálogo real não tem esse campo separado — o nome da voz já é descritivo).
+10. **Progresso** (Frame 7) — stat cards (tentativas totais + acerto médio sobre TODAS as tentativas, não
+    só a última de cada exercício), "Padrões de erro mais comuns" via `GET /dashboard/heatmap` (endpoint já
+    existia, nunca tinha sido consumido pelo frontend), tentativas recentes com "hoje"/"ontem"/"Nd atrás".
+11. **Layout desktop** (breakpoint ≥1024px) — `AppShell` ganhou `.sidebar-nav` (mesmo `NAV_ITEMS`, só o
+    container muda por CSS — os dois containers ficam sempre no DOM, `display:none` esconde o que não é da
+    faixa de largura atual). Conteúdo com largura máxima legível (640px), não estica os cards de leiaute
+    mobile pra ocupar a tela toda.
+12. **Persistência de tema/accent color** — migration `0017` (`users.theme`/`users.accent_color`, mesmo
+    padrão de `preferred_voice_ja/en`), `PATCH /users/me/appearance` (patch parcial via ponteiros — `nil`
+    = campo ausente não mexe, `""` = reseta pro default). `AppearanceContext` novo aplica no
+    `document.documentElement` (`data-theme` + `--accent-base`/`data-accent-preset="mono"`).
+    `AppearanceSection` (sem frame próprio no design — o `.dc.html` só tem um painel de Tweaks pro preview
+    do PRÓPRIO design, não uma tela pro usuário final; composição nossa sobre os tokens já existentes)
+    dentro de `VoiceSettingsPage`. **Regressão pega e corrigida no processo**: `AppearanceContext` passou a
+    chamar `GET /users/me` em toda página autenticada — 6 specs e2e com token falso não mockavam esse
+    endpoint, o 401 real disparava o fluxo de refresh (também falha) e redirecionava pra `/login` no meio
+    do teste. Corrigido com um helper `mockProfile()` novo em `e2e/helpers.ts`.
+13. **e2e por tipo, mobile+desktop** — `exercise-types.spec.ts` novo: os 8 `exercise_type` ponta a ponta
+    (pergunta → resposta → resultado real), cada um 1x em 390x844 e 1x em 1440x900 via
+    `test.use({viewport})`, estrutura parametrizada (array de casos + loop gerando `test()`), + 2 testes
+    checando a visibilidade certa do chrome (sidebar vs bottom nav) por viewport. **Bug de UX real achado
+    e corrigido**: `WordOrderExercise` não dava nenhum feedback visual de acerto — corrigido com classes
+    `word-chip-correct`/`incorrect`.
+
+### Decisão de escopo — 7 tipos novos não persistem tentativa (herdada da Fase A, com consequência visível na Fase B)
+`POST /answer`/`POST /text-attempt` continuam stateless (decisão da Fase A). Consequência visível agora:
+progresso de cenário (`useScenariosProgress`) e a tela de Progresso só contam tentativas de
+`audio_pronunciation` — um exercício dos 7 tipos novos dentro de um cenário nunca aparece como "completo".
+Documentado, não escondido; revisitar essa decisão (persistir tentativa pros 7 tipos novos) é trabalho
+novo, não implícito neste pedido.
+
+### Verificação final
+`go build`/`go vet`/`go test ./...` (core-api) e `tsc -b`/`oxlint`/`playwright test` (web, **29/29 e2e**:
+11 specs originais + 18 novos de `exercise-types.spec.ts`) limpos em cada um dos 17 commits. Cada tela
+nova/reskinada foi conferida visualmente ao vivo (screenshot Playwright descartável, não commitado) contra
+a stack real rodando via `docker compose`, incluindo os 8 fluxos de exercício completos, dark mode, acento
+customizado sobrevivendo a reload, e o breakpoint desktop.
+
+## Última ação (histórico — acesso via LAN pro `web`/`core-api`, follow-up fora da FASE B)
 
 Pedido do usuário: testar o app pelo celular na mesma rede Wi-Fi, não só localhost. 3 partes, sem mudar nada
 de produção:
