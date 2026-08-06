@@ -1,18 +1,72 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
-Trabalho pós-MVP mais recente: **login por PIN numérico** (tela de seleção de perfil, ver "Última ação"
-abaixo). Antes disso: deploy de produção same-origin no nginx compartilhado do Ascend + suporte
-multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz com preview + catálogo de
-vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício (FASE A) + import do design
-`Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via LAN em dev — **TUDO
-CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que priorizar em
-seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de exercício não
-persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última ação" pro
-trabalho mais recente e as seções seguintes pro histórico completo.
+Trabalho pós-MVP mais recente: **seed de scenarios en-US** (migration 0019, ver "Última ação" abaixo) —
+corrigiu os 30 exercícios de inglês que existiam no banco mas nunca apareciam na UI. Antes disso: login por
+PIN numérico (tela de seleção de perfil) + deploy de produção same-origin no nginx compartilhado do Ascend +
+suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz com preview +
+catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício (FASE A) +
+import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via LAN em dev —
+**TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que
+priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de
+exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última
+ação" pro trabalho mais recente e as seções seguintes pro histórico completo.
 
-## Última ação — Login por PIN numérico (tela de seleção de perfil, substitui o login tradicional como
-entrada padrão)
+## Última ação — Seed de scenarios en-US (migration 0019) — corrige exercícios de inglês invisíveis na UI
+
+**Causa raiz confirmada**: a migration `0013_create_scenarios` criou a tabela `scenarios` e as colunas
+`scenario_id`/`order_in_scenario` em `exercises`, e a `0014_seed_scenarios_japanese_pilot` populou 3
+scenarios ja-JP — mas nunca existiu migration equivalente pra en-US. Os 30 exercícios importados pela
+`0012_seed_exercises_english_curriculum` (6 categorias × 5 exercícios, `sprint_day_ref` 1-30) ficaram com
+`scenario_id` sempre `NULL`. Como o frontend navega exercício por scenario (não lista solta), esse conteúdo
+inteiro em inglês nunca aparecia — **confirmado por teste real do usuário**: login como Vitória, zero
+exercícios en-US visíveis. Não era dado corrompido nem bug de query, era lacuna de seed nunca preenchida.
+
+### O que foi feito
+- `core-api/migrations/0019_seed_scenarios_english_curriculum.{up,down}.sql` — cria 6 scenarios en-US (1 por
+  categoria: saudacoes/compras/restaurante/direcoes/emergencia_saude/trabalho_social), `order_index` 1-6
+  seguindo a ordem crescente de `sprint_day_ref` (progressão de dificuldade já implícita no currículo).
+- **Numeração da migration**: o pedido original sugeria `0015`, mas `0015` já existe (`preferred_voice`,
+  sessão de seleção de voz) — a migration mais recente no repo era `0018` (login por PIN). Decisão técnica
+  razoável dentro da Sec. 0 do CLAUDE.md: segui a numeração sequencial real (`0019`), não o número sugerido
+  no pedido, documentando aqui em vez de perguntar.
+- **Link exercício→scenario via `ROW_NUMBER() OVER (PARTITION BY category ORDER BY sprint_day_ref)`**,
+  diferente da `0014` (que linkava por `expected_transcript` exato — só viável lá porque cada texto era
+  único). Aqui, com exatamente 5 exercícios por categoria, particionar por `category` e ordenar por
+  `sprint_day_ref` atribui `order_in_scenario` 1-5 sem ambiguidade e sem precisar hardcodar UUID nem
+  transcript de cada linha — mais robusto a reordenação futura do seed.
+- DOWN reverte limpo: `UPDATE` zera `scenario_id`/`order_in_scenario` dos exercícios afetados, depois
+  `DELETE` dos 6 scenarios criados (mesmo padrão da `0014`). Não tocou em `0012` (seed original), `0014`
+  (ja-JP) nem em nenhum campo de `exercises` além dos dois de vínculo.
+
+### Verificação real (não só a migration "rodou sem erro")
+- Stack Docker de dev subida de verdade (`docker compose build core-api` — **de novo confirmado que
+  `docker compose up` sozinho não pega migration nova na imagem**, mesmo achado da sessão de PIN — depois
+  `docker compose up -d core-api`); `schema_migrations` foi de `18` → `19`.
+- `SELECT language, count(*) FROM scenarios GROUP BY language` → `en-US: 6, ja-JP: 3`.
+- `SELECT count(*) FROM exercises WHERE language='en-US' AND scenario_id IS NULL` → `0`.
+- Query de detalhe confirmou os 30 exercícios en-US, um scenario por categoria, `order_in_scenario` 1-5
+  batendo exatamente com a ordem de `sprint_day_ref` dentro de cada categoria.
+- **Ciclo completo up → down → up** via `migrate` CLI (golang-migrate) direto contra o Postgres de dev
+  (`localhost:5433`, exposto pelo `docker-compose.yml`): down deixou `en-US: 0 scenarios` e as 30
+  exercícios de volta com `scenario_id IS NULL` (contagem exata), `schema_migrations` voltou a `18`; up de
+  novo reproduziu o estado final idêntico (`en-US: 6`, `0` órfãos, versão `19`) — idempotência confirmada,
+  não assumida.
+- **API real via curl autenticado** (conta descartável registrada/logada/depois deletada — Cazé/Vitória não
+  foram usados): `GET /scenarios?language=en-US` devolveu os 6 scenarios com título/contexto/order_index
+  corretos; `GET /scenarios?language=ja-JP` confirmou zero regressão nos 3 scenarios japoneses;
+  `GET /scenarios/{id}` do scenario "Conhecer alguém pela primeira vez" devolveu os 5 exercícios da
+  categoria `saudacoes` aninhados na ordem certa (`order_in_scenario` 1→5, `sprint_day_ref` 1→5).
+- `go test ./...` em `core-api`: todos os pacotes passando, zero regressão (esta migration não mexeu em
+  código Go, só em SQL de seed — nenhum teste unitário novo era esperado/necessário).
+
+### Débito NÃO criado por esta sessão (contexto, não ação pendente)
+Os exercícios en-US continuam sem `exercise_type` variado (todos `audio_pronunciation`, ver seed da `0012`)
+— fora de escopo, não pedido. Scenarios em si não têm teste automatizado no backend (`internal/scenarios`
+não tem arquivo de teste, mesma situação de antes desta sessão, não uma regressão introduzida agora).
+
+## Última ação (anterior) — Login por PIN numérico (tela de seleção de perfil, substitui o login tradicional
+como entrada padrão)
 
 **Pedido do usuário**: trocar a tela de login usuário+senha por uma seleção de perfil (cards Cazé/Vitória)
 com PIN numérico, mantendo o login por senha como fallback oculto de recuperação de conta.
@@ -1635,11 +1689,16 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
     do CLAUDE.md), não esquecimento.
 
 ## Próximo passo imediato
-Login por PIN está **implementado, testado (backend + visual) e commitado** (ver "Última ação" no topo).
-Não é um item de código pendente, mas o PIN dos dois usuários reais ainda não foi configurado — próximo
-passo é manual, não meu: Cazé e Vitória precisam logar uma vez com email+senha e chamar
-`POST /auth/pin-setup` (autenticado) pra cada um configurar o próprio PIN. Depois disso, `/login` já lista
-os dois cards automaticamente (a UI não precisa de nenhuma mudança pra isso acontecer).
+Seed de scenarios en-US está **implementado, testado (migration real + API real) e commitado, só aplicado em
+dev** (ver "Última ação" no topo) — a migration 0019 **ainda não foi aplicada na VM de produção**, por
+instrução explícita do pedido original (deploy em prod é passo manual separado, a confirmar pelo usuário
+depois de revisar). Próximo passo, se o usuário confirmar: rodar a mesma migration contra o Postgres de
+produção (a imagem `core-api` de prod também precisa do rebuild + restart, mesmo achado desta e da sessão
+anterior).
+
+Login por PIN continua **implementado, testado (backend + visual) e commitado**, sem trabalho pendente de
+código — só falta o passo manual (não meu) de Cazé e Vitória logarem uma vez com email+senha e chamarem
+`POST /auth/pin-setup` pra configurar o próprio PIN.
 
 Sem instrução nova do usuário, ao reabrir uma sessão: (a) rodar a suite completa (`go test ./...` em
 `core-api`, `npm run build && npm run test:e2e` em `web`) pra confirmar que nada quebrou; (b) considerar o
