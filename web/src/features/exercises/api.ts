@@ -1,5 +1,15 @@
 import { api } from "../../lib/apiClient";
 
+export type ExerciseType =
+  | "audio_pronunciation"
+  | "multiple_choice_translation"
+  | "word_order"
+  | "verb_conjugation"
+  | "dictation"
+  | "free_translation"
+  | "matching_pairs"
+  | "true_false";
+
 export interface Exercise {
   id: string;
   category: string;
@@ -11,6 +21,8 @@ export interface Exercise {
   language: string;
   scenario_id?: string;
   order_in_scenario?: number;
+  exercise_type: ExerciseType;
+  type_data?: unknown;
 }
 
 export interface Scenario {

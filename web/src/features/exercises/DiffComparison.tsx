@@ -1,7 +1,5 @@
 import { alignForDisplay } from "../../lib/kanaAlign";
 import { toRomaji } from "../../lib/romaji";
-import { explainDiff } from "./diffExplain";
-import { SpeakButton } from "../../components/audio/SpeakButton";
 import type { DiffEntry } from "./api";
 
 interface DiffComparisonProps {
@@ -9,7 +7,8 @@ interface DiffComparisonProps {
   actual: string;
   diff: DiffEntry[];
   language?: string;
-  exerciseId: string;
+  /** Rótulo da 2ª linha — "Você disse" (áudio) ou "Você digitou" (texto/ditado). */
+  actualLabel?: string;
 }
 
 // Romaji só faz sentido como apoio de leitura pra kana — em inglês seria só
@@ -18,12 +17,15 @@ function isJapanese(language: string): boolean {
   return language.toLowerCase().startsWith("ja");
 }
 
-export function DiffComparison({ expected, actual, diff, language = "ja-JP", exerciseId }: DiffComparisonProps) {
+// Card "Esperado / Você disse" do Frame 5 — o botão de ouvir pronúncia saiu
+// daqui (não faz mais parte da linha "Esperado") e virou um botão próprio no
+// rodapé da tela de resultado (AudioResultView), igual ao design.
+export function DiffComparison({ expected, actual, diff, language = "ja-JP", actualLabel = "Você disse" }: DiffComparisonProps) {
   const columns = alignForDisplay(expected, actual, diff, language);
   const showRomaji = isJapanese(language);
 
   return (
-    <div className="diff-comparison">
+    <div className="card diff-comparison">
       <div className="diff-row" data-testid="diff-row-expected">
         <span className="diff-row-label">Esperado</span>
         <div className="diff-chars">
@@ -31,24 +33,15 @@ export function DiffComparison({ expected, actual, diff, language = "ja-JP", exe
             <DiffChar key={col.position} char={col.expectedChar} mismatch={col.entry !== null} showRomaji={showRomaji} />
           ))}
         </div>
-        <SpeakButton exerciseId={exerciseId} className="speak-button-inline" />
       </div>
       <div className="diff-row" data-testid="diff-row-actual">
-        <span className="diff-row-label">Você disse</span>
+        <span className="diff-row-label">{actualLabel}</span>
         <div className="diff-chars">
           {columns.map((col) => (
             <DiffChar key={col.position} char={col.actualChar} mismatch={col.entry !== null} showRomaji={showRomaji} />
           ))}
         </div>
       </div>
-
-      {diff.length > 0 && (
-        <ul className="diff-explanations" data-testid="diff-explanations">
-          {diff.map((entry, index) => (
-            <li key={index}>{explainDiff(entry, language)}</li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

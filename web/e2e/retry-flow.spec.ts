@@ -37,7 +37,7 @@ test("erro -> retry -> acerto: 1 clique só entre ver o erro e voltar a gravar, 
   await page.getByRole("button", { name: /Gravar/ }).click();
   await page.getByRole("button", { name: /Parar gravação/ }).click();
   await page.getByRole("button", { name: "Enviar" }).click();
-  await expect(page.getByText("Veredito: FAIL")).toBeVisible();
+  await expect(page.locator(".verdict-pill-fail")).toBeVisible();
 
   const urlAfterFail = page.url();
   // React StrictMode invoca o efeito de carregamento 2x em dev (mesmo padrão
@@ -57,7 +57,7 @@ test("erro -> retry -> acerto: 1 clique só entre ver o erro e voltar a gravar, 
   // 2ª tentativa: acerta.
   await page.getByRole("button", { name: /Parar gravação/ }).click();
   await page.getByRole("button", { name: "Enviar" }).click();
-  await expect(page.getByText("Veredito: PASS")).toBeVisible();
+  await expect(page.locator(".verdict-pill-pass")).toBeVisible();
 
   expect(attemptCalls).toBe(2);
 });

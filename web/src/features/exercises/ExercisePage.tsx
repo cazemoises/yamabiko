@@ -3,9 +3,14 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getExercise, getScenario, submitAttempt, type AttemptResult, type Exercise, type ScenarioDetail } from "./api";
 import { AudioRecorder } from "../../components/audio/AudioRecorder";
 import { SpeakButton } from "../../components/audio/SpeakButton";
-import { DiffComparison } from "./DiffComparison";
+import { AudioResultView } from "./AudioResultView";
+import { TopBar } from "../../components/layout/TopBar";
 import { ApiError } from "../../lib/apiClient";
 
+// Dispatcher por exercise_type (Frames 4/5 = audio_pronunciation, Frames
+// 9-19 = os 7 tipos novos da Fase A) — só audio_pronunciation está
+// implementado nesta tela por enquanto; os outros entram em commits
+// próprios seguintes, um tipo por vez.
 export function ExercisePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -13,6 +18,7 @@ export function ExercisePage() {
   const [scenario, setScenario] = useState<ScenarioDetail | null>(null);
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [attemptNumber, setAttemptNumber] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -20,6 +26,7 @@ export function ExercisePage() {
     if (!id) return;
     setResult(null);
     setError(null);
+    setAttemptNumber(0);
     getExercise(id)
       .then(setExercise)
       .catch(() => setLoadError("Exercício não encontrado"));
@@ -51,8 +58,14 @@ export function ExercisePage() {
     }
   }
 
-  if (loadError) return <p className="error">{loadError}</p>;
-  if (!exercise) return <p>Carregando...</p>;
+  function handleRetry(): void {
+    setResult(null);
+    setError(null);
+    setAttemptNumber((n) => n + 1);
+  }
+
+  if (loadError) return <p className="error center-message">{loadError}</p>;
+  if (!exercise) return <p className="center-message">Carregando...</p>;
 
   const scenarioExercises = scenario?.exercises ?? [];
   const currentIndex = scenario ? scenarioExercises.findIndex((e) => e.id === exercise.id) : -1;
@@ -65,72 +78,75 @@ export function ExercisePage() {
     navigate(`/exercises/${nextExercise.id}`);
   }
 
-  return (
-    <div className="exercise-page">
-      <Link to="/exercises">&larr; Voltar</Link>
+  if (exercise.exercise_type && exercise.exercise_type !== "audio_pronunciation") {
+    return (
+      <div>
+        <TopBar backTo="/exercises" />
+        <p className="center-message">
+          Tipo de exercício "{exercise.exercise_type}" ainda não tem tela própria — chega em breve.
+        </p>
+      </div>
+    );
+  }
 
-      {inScenario && (
-        <div className="scenario-banner">
-          <p className="scenario-context">{scenario.context_description_pt}</p>
-          <div
-            className="scenario-progress"
-            role="progressbar"
-            aria-label={`Progresso do cenário ${scenario.title_pt}`}
-            aria-valuemin={1}
-            aria-valuemax={scenarioExercises.length}
-            aria-valuenow={currentIndex + 1}
-          >
-            <div className="scenario-progress-bar">
-              <div
-                className="scenario-progress-fill"
-                style={{ width: `${((currentIndex + 1) / scenarioExercises.length) * 100}%` }}
-              />
-            </div>
-            <span className="scenario-progress-label">
-              {currentIndex + 1} de {scenarioExercises.length}
-            </span>
-          </div>
+  return (
+    <div>
+      <TopBar
+        progress={inScenario ? { current: currentIndex + 1, total: scenarioExercises.length } : undefined}
+        backTo={inScenario ? undefined : "/exercises"}
+      />
+
+      {inScenario && !result && (
+        <div className="context-banner">
+          <span className="context-banner-body">{scenario.context_description_pt}</span>
         </div>
       )}
 
-      <h1>{exercise.prompt_pt}</h1>
-      <p className="expected-transcript">{exercise.expected_transcript}</p>
-      {exercise.expected_romaji && <p className="expected-romaji">{exercise.expected_romaji}</p>}
-      <SpeakButton exerciseId={exercise.id} />
+      {!result && (
+        <>
+          <div className="exercise-prompt">
+            <span className="exercise-prompt-hint">{exercise.prompt_pt}</span>
+            <span className={exercise.language?.startsWith("ja") ? "jp exercise-prompt-main jp-lg" : "exercise-prompt-main"}>
+              {exercise.expected_transcript}
+            </span>
+            {exercise.expected_romaji && <span className="exercise-prompt-sub">{exercise.expected_romaji}</span>}
+          </div>
 
-      {!passedInScenario && <AudioRecorder key={exercise.id} onRecorded={handleRecorded} disabled={submitting} />}
+          <div className="record-stage">
+            <SpeakButton exerciseId={exercise.id} />
+            <AudioRecorder key={attemptNumber} autoStart={attemptNumber > 0} onRecorded={handleRecorded} disabled={submitting} />
+          </div>
+        </>
+      )}
 
-      {submitting && <p>Enviando e transcrevendo...</p>}
+      {submitting && <p className="center-message">Enviando e transcrevendo...</p>}
       {error && <p className="error">{error}</p>}
 
       {result && (
-        <div className={`attempt-result verdict-${result.verdict.toLowerCase()}`}>
-          <p>Você disse: {result.transcript || "(nada detectado)"}</p>
-          <p>Score: {Math.round(result.score * 100)}%</p>
-          <p>Veredito: {result.verdict}</p>
-          <p>XP ganho: +{result.xp_gained}</p>
-          {result.diff.length > 0 && (
-            <DiffComparison
-              expected={exercise.expected_transcript}
-              actual={result.transcript}
-              diff={result.diff}
-              language={exercise.language || "ja-JP"}
-              exerciseId={exercise.id}
-            />
-          )}
-
-          {passedInScenario &&
-            (nextExercise ? (
-              <button type="button" className="scenario-next-button" onClick={handleNext}>
-                Próximo &rarr;
-              </button>
+        <>
+          <AudioResultView exercise={exercise} result={result} />
+          <div className="btn-block-group">
+            {passedInScenario ? (
+              nextExercise ? (
+                <button type="button" className="btn-primary" onClick={handleNext}>
+                  Próximo →
+                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <p style={{ fontWeight: 700, color: "var(--text)" }}>🎉 Cenário concluído!</p>
+                  <Link to="/exercises" style={{ fontSize: 13 }}>
+                    Voltar aos exercícios
+                  </Link>
+                </div>
+              )
             ) : (
-              <div className="scenario-complete">
-                <p>🎉 Cenário concluído!</p>
-                <Link to="/exercises">Voltar aos exercícios</Link>
-              </div>
-            ))}
-        </div>
+              <button type="button" className="btn-primary" onClick={handleRetry}>
+                Tentar de novo
+              </button>
+            )}
+            <SpeakButton exerciseId={exercise.id} label="Ouvir pronúncia esperada" />
+          </div>
+        </>
       )}
     </div>
   );
