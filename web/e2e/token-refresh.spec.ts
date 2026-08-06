@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
 
 const EXERCISE = {
   id: "ex-1",
@@ -41,6 +41,14 @@ test.describe("interceptor de refresh de token", () => {
       await route.fulfill({ status: 200, json: { access_token: "new-token" } });
     });
 
+    // AppearanceProvider (App.tsx) também chama GET /users/me em toda página
+    // autenticada — sem mockar, esse fetch corre em paralelo com o de
+    // /exercises*, cada um disparando seu próprio ciclo de 401+refresh, e
+    // dependendo do timing exato das respostas os dois podem NÃO cair no
+    // mesmo refreshInFlight (dedup só funciona se as 2 chamadas de refresh
+    // se sobrepõem), duplicando refreshCalls. Mockar aqui isola o teste pro
+    // que ele quer medir de verdade: o ciclo de /exercises*.
+    await mockProfile(page);
     await seedTokensOnce(page, "expired-token", "valid-refresh-token");
 
     await page.goto("/exercises");

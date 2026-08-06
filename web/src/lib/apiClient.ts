@@ -1,6 +1,25 @@
 import { clearTokens, getAccessToken, getRefreshToken, setAccessToken } from "./auth";
 
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:9001";
+// Porta do core-api em dev — fixa porque é a mesma em qualquer rede (mapeada
+// pelo docker-compose, "9001:8080"); só o HOST varia (localhost, IP da LAN,
+// Tailscale). Ver CORE_API_DEV_PORT.
+const CORE_API_DEV_PORT = "9001";
+
+// "localhost" hardcoded aqui quebrava o acesso via celular/rede local: o
+// dispositivo cliente resolve "localhost" pra ELE MESMO, nunca pro servidor
+// (Sec. pedida pelo usuário). Sem VITE_API_BASE_URL setado explicitamente
+// (build de produção deve sempre setar), o default agora é relativo ao HOST
+// com que a própria página foi carregada — abrir o app em
+// http://192.168.0.106:5173 já faz as chamadas de API irem pra
+// http://192.168.0.106:9001 sozinho, sem configuração manual por
+// dispositivo. Funciona igual pra localhost, IP de LAN ou Tailscale, porque
+// os 3 casos só diferem no hostname que o browser já usou pra carregar a
+// página.
+function defaultApiBaseUrl(): string {
+  return `${window.location.protocol}//${window.location.hostname}:${CORE_API_DEV_PORT}`;
+}
+
+const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? defaultApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;
