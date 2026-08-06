@@ -20,19 +20,22 @@ func ftTypeData(t *testing.T, acceptable []string) json.RawMessage {
 func TestValidateFreeTranslation_Correct(t *testing.T) {
 	typeData := ftTypeData(t, []string{"I am a student", "I'm a student"})
 
-	result, err := validation.ValidateFreeTranslation(typeData, "en-US", "I am a student")
+	result, matched, err := validation.ValidateFreeTranslation(typeData, "en-US", "I am a student")
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
 	if result.Verdict != comparison.VerdictPass {
 		t.Fatalf("esperava PASS pra tradução idêntica a uma acceptable_answer, veio %s", result.Verdict)
 	}
+	if matched != "I am a student" {
+		t.Fatalf("esperava matchedAnswer='I am a student', veio %q", matched)
+	}
 }
 
 func TestValidateFreeTranslation_Incorrect(t *testing.T) {
 	typeData := ftTypeData(t, []string{"I am a student", "I'm a student"})
 
-	result, err := validation.ValidateFreeTranslation(typeData, "en-US", "the weather is nice today")
+	result, _, err := validation.ValidateFreeTranslation(typeData, "en-US", "the weather is nice today")
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
@@ -47,11 +50,14 @@ func TestValidateFreeTranslation_Incorrect(t *testing.T) {
 func TestValidateFreeTranslation_PicksBestScoreNotFirst(t *testing.T) {
 	typeData := ftTypeData(t, []string{"the weather is nice today", "I'm a student"})
 
-	result, err := validation.ValidateFreeTranslation(typeData, "en-US", "I'm a student")
+	result, matched, err := validation.ValidateFreeTranslation(typeData, "en-US", "I'm a student")
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
 	if result.Verdict != comparison.VerdictPass {
 		t.Fatalf("esperava PASS (melhor score é a 2ª acceptable_answer, idêntica), veio %s (score %.2f)", result.Verdict, result.SimilarityScore)
+	}
+	if matched != "I'm a student" {
+		t.Fatalf("esperava matchedAnswer='I'm a student' (a 2ª, não a 1ª), veio %q", matched)
 	}
 }

@@ -125,9 +125,14 @@ type textAttemptRequest struct {
 
 type textAttemptResponse struct {
 	Transcript string                 `json:"transcript"`
-	Score      float64                `json:"score"`
-	Verdict    comparison.Verdict     `json:"verdict"`
-	Diff       []comparison.DiffEntry `json:"diff"`
+	// Expected é o texto contra o qual o backend de fato comparou —
+	// exercise.ExpectedTranscript pra dictation, mas pra free_translation é
+	// QUAL das várias acceptable_answers venceu (o frontend não tem como
+	// adivinhar isso só com type_data, que lista todas as opções).
+	Expected string                 `json:"expected"`
+	Score    float64                `json:"score"`
+	Verdict  comparison.Verdict     `json:"verdict"`
+	Diff     []comparison.DiffEntry `json:"diff"`
 }
 
 // TextAttempt serve POST /exercises/{id}/text-attempt — dictation e
@@ -148,12 +153,14 @@ func (h *Handler) TextAttempt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var result comparison.Result
+	var expected string
 	switch exercise.ExerciseType {
 	case "dictation":
-		result = validation.ValidateDictation(exercise.ExpectedTranscript, exercise.Language, req.Transcript)
+		expected = exercise.ExpectedTranscript
+		result = validation.ValidateDictation(expected, exercise.Language, req.Transcript)
 	case "free_translation":
 		var err error
-		result, err = validation.ValidateFreeTranslation(exercise.TypeData, exercise.Language, req.Transcript)
+		result, expected, err = validation.ValidateFreeTranslation(exercise.TypeData, exercise.Language, req.Transcript)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "type_data do exercício está mal formado")
 			return
@@ -165,6 +172,7 @@ func (h *Handler) TextAttempt(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, textAttemptResponse{
 		Transcript: req.Transcript,
+		Expected:   expected,
 		Score:      result.SimilarityScore,
 		Verdict:    result.Verdict,
 		Diff:       result.PhoneticDiff,
