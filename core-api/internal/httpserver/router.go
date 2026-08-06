@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -27,11 +29,12 @@ func NewRouter(
 	ttsHandler *tts.Handler,
 	scenariosHandler *scenarios.Handler,
 	corsAllowedOrigins []string,
+	corsAllowLocalNetwork bool,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(cors.Handler(corsOptions(corsAllowedOrigins)))
+	r.Use(cors.Handler(corsOptions(corsAllowedOrigins, corsAllowLocalNetwork)))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -91,12 +94,51 @@ func NewRouter(
 // mesmo a requisição tendo chegado ao servidor. Foi exatamente o que
 // aconteceu com PATCH /users/me/voice-preference: a rota existia e
 // respondia 200, só faltava "PATCH" nesta lista.
-func corsOptions(allowedOrigins []string) cors.Options {
-	return cors.Options{
-		AllowedOrigins:   allowedOrigins,
+//
+// allowLocalNetwork (env CORS_ALLOW_LOCAL_NETWORK, dev-only opt-in — Sec.
+// pedida pelo usuário pra testar o `web` a partir do celular na mesma
+// Wi-Fi) troca AllowedOrigins por AllowOriginFunc: além da whitelist
+// estática, aceita qualquer origin http:// cujo host resolva pra um IP de
+// rede privada (RFC1918) ou loopback, sem precisar fixar o IP da máquina
+// (que muda a cada rede/DHCP). Quando desligado (default), o
+// comportamento é idêntico ao de antes — só AllowedOrigins, nada de
+// AllowOriginFunc.
+func corsOptions(allowedOrigins []string, allowLocalNetwork bool) cors.Options {
+	opts := cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}
+
+	if !allowLocalNetwork {
+		opts.AllowedOrigins = allowedOrigins
+		return opts
+	}
+
+	static := make(map[string]bool, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		static[origin] = true
+	}
+	opts.AllowOriginFunc = func(_ *http.Request, origin string) bool {
+		return static[origin] || isLocalNetworkOrigin(origin)
+	}
+	return opts
+}
+
+// isLocalNetworkOrigin reconhece origins como http://192.168.1.42:5173 —
+// qualquer host que seja um IP literal de rede privada ou loopback. Não
+// aceita HTTPS de propósito (dev local só, sem certificado válido pro IP
+// da máquina) nem hostnames (só IP literal — evita abrir pra qualquer
+// domínio que por acaso resolva pra uma rede privada via DNS rebinding).
+func isLocalNetworkOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	ip := net.ParseIP(u.Hostname())
+	if ip == nil {
+		return false
+	}
+	return ip.IsPrivate() || ip.IsLoopback()
 }

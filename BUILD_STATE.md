@@ -2,11 +2,64 @@
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
-com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + **backend dos 7 novos tipos de exercício
-(FASE A)** — **CONCLUÍDO** (ver "Última ação" abaixo). **EM ANDAMENTO: FASE B — import do design
-`Yamabiko.dc.html` e substituição do frontend + layout desktop + persistência de tema/accent** (pedido do
-mesmo usuário, "duas fases, nessa ordem, sem pausar entre elas" — ver task list ativa e a seção logo depois
-desta pra retomar exatamente de onde parou).
+com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
+(FASE A) — **CONCLUÍDO**. **EM ANDAMENTO: FASE B — import do design `Yamabiko.dc.html` e substituição do
+frontend.** Progresso da FASE B até agora (11 commits): design importado (tokens/shell/nav), os 8
+exercise_type integrados com resultado real (áudio + 7 novos da Fase A), configurações de voz e progresso
+reskinados. **Faltam**: layout desktop (sidebar), persistência de tema/accent color, e2e por tipo em
+mobile+desktop. Ver "Última ação" abaixo pro detalhe de cada commit e o próximo passo exato.
+
+## Última ação — acesso via LAN pro `web`/`core-api` (pedido de follow-up, fora da FASE B)
+
+Pedido do usuário: testar o app pelo celular na mesma rede Wi-Fi, não só localhost. 3 partes, sem mudar nada
+de produção:
+
+1. **`web/vite.config.ts`**: `server.host = true` (== `0.0.0.0`) — o dev server do Vite por padrão só aceita
+   conexão da própria máquina; sem isso, abrir `http://192.168.x.x:5173` de outro dispositivo nem chega a
+   conectar. Confirmado ao vivo: `npx vite` agora lista `Network: http://192.168.0.106:5173/ (Wi-Fi)` (e
+   também a interface Tailscale/WSL, irrelevantes aqui) em vez de só `Local: http://localhost:5173/`.
+2. **`core-api`**: `CORS_ALLOWED_ORIGINS` continua existindo (whitelist estática, agora só com
+   `http://localhost:5173`), mas ganhou um companheiro **`CORS_ALLOW_LOCAL_NETWORK`** (bool, env var,
+   default `false`/desligado — não muda nada em produção) que troca `cors.Options.AllowedOrigins` por
+   `AllowOriginFunc`: além da whitelist estática, aceita qualquer origin `http://` cujo **host seja um IP
+   literal de rede privada (RFC1918, via `net.IP.IsPrivate()`) ou loopback** — sem fixar nenhum IP no
+   código ou na env var (pedido explícito do usuário: "não hardcoded"). Rejeita de propósito: HTTPS (dev
+   local não tem certificado válido pro IP da máquina), hostnames que não sejam IP literal (evita abrir
+   pra qualquer domínio que resolva pra rede privada via DNS rebinding), e qualquer IP público.
+   `docker-compose.yml` (`core-api.environment`) ganhou `CORS_ALLOW_LOCAL_NETWORK=true` — isso **substituiu**
+   uma lista de 2 IPs fixos (`192.168.0.106`, `100.83.153.119`) que já estava hardcoded ali antes desta
+   sessão (aparentemente um teste manual anterior do usuário), exatamente o padrão que o pedido queria
+   evitar.
+3. **Portas do `docker-compose.yml`**: já publicadas com a sintaxe curta `"HOST:CONTAINER"` (`9001:8080`
+   etc.), que o Docker expõe em **todas** as interfaces de rede do host por padrão (precisaria de
+   `"127.0.0.1:9001:8080"` pra restringir a loopback, o que nenhum serviço aqui faz) — nada pra mudar aqui,
+   só confirmado e documentado via comentário no arquivo.
+
+**IP de exemplo pra referência futura** (a Wi-Fi real da máquina desta sessão, `ipconfig` confirmou —
+muda a cada rede, é só ilustrativo): `192.168.0.106`. URLs de acesso pelo celular na mesma Wi-Fi:
+- Web: `http://192.168.0.106:5173`
+- core-api direto (health-check): `http://192.168.0.106:9001/health`
+
+**Pegadinha real, documentada pra não confundir no futuro**: o `web` lê a URL do `core-api` de
+`VITE_API_BASE_URL` (`web/src/lib/apiClient.ts`), com default `http://localhost:9001`. Abrir
+`http://192.168.0.106:5173` no celular carrega a página certinho (é só HTML/JS estático), **mas as
+chamadas de API vão falhar silenciosamente** — o browser do celular vai tentar `http://localhost:9001`, ou
+seja, a porta 9001 *do próprio celular*, que não existe. Pra funcionar de verdade pelo celular, o Vite
+precisa subir com `VITE_API_BASE_URL=http://192.168.0.106:9001` setado (ex:
+`VITE_API_BASE_URL=http://192.168.0.106:9001 npx vite`, ajustando o IP pro IP real da máquina naquela
+rede). Não automatizado (mudaria o comando padrão de dev pra maioria dos casos, onde só localhost já
+basta) — só documentado aqui.
+
+Verificado ao vivo: `docker compose up -d --build core-api`, preflight com `Origin:
+http://192.168.0.106:5173` devolve `Access-Control-Allow-Origin` correto; `Origin: http://8.8.8.8:5173`
+(IP público) continua sem o header. `curl http://192.168.0.106:5173/` e `curl
+http://192.168.0.106:9001/health` respondem 200 (mesma máquina, simulando alcançabilidade externa via IP
+em vez de localhost). `go build`/`go vet`/`go test ./...` (novo pacote de testes
+`TestCORS_LocalNetwork_*` cobrindo: desligado por padrão, aceita as 3 faixas RFC1918 + loopback quando
+ligado, continua rejeitando IP público/HTTPS/hostname mesmo ligado) e `tsc -b`/`oxlint`/`playwright test`
+(11/11) limpos.
+
+## Última ação (histórico — FASE B em andamento, 11 commits até agora)
 
 ## Última ação — FASE A: backend dos 7 novos tipos de exercício
 

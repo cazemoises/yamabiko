@@ -8,16 +8,17 @@ import (
 )
 
 type Config struct {
-	Port               string
-	DatabaseURL        string
-	JWTSecret          string
-	AccessTokenTTL     time.Duration
-	RefreshTokenTTL    time.Duration
-	STTServiceURL      string
-	CORSAllowedOrigins []string
-	VoicevoxURL        string
-	PiperAddress       string
-	AudioCacheDir      string
+	Port                  string
+	DatabaseURL           string
+	JWTSecret             string
+	AccessTokenTTL        time.Duration
+	RefreshTokenTTL       time.Duration
+	STTServiceURL         string
+	CORSAllowedOrigins    []string
+	CORSAllowLocalNetwork bool
+	VoicevoxURL           string
+	PiperAddress          string
+	AudioCacheDir         string
 }
 
 func Load() (*Config, error) {
@@ -61,16 +62,17 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Port:               port,
-		DatabaseURL:        dbURL,
-		JWTSecret:          secret,
-		AccessTokenTTL:     15 * time.Minute,
-		RefreshTokenTTL:    7 * 24 * time.Hour,
-		STTServiceURL:      sttServiceURL,
-		CORSAllowedOrigins: corsAllowedOrigins(),
-		VoicevoxURL:        voicevoxURL,
-		PiperAddress:       piperAddress,
-		AudioCacheDir:      audioCacheDir,
+		Port:                  port,
+		DatabaseURL:           dbURL,
+		JWTSecret:             secret,
+		AccessTokenTTL:        15 * time.Minute,
+		RefreshTokenTTL:       7 * 24 * time.Hour,
+		STTServiceURL:         sttServiceURL,
+		CORSAllowedOrigins:    corsAllowedOrigins(),
+		CORSAllowLocalNetwork: corsAllowLocalNetwork(),
+		VoicevoxURL:           voicevoxURL,
+		PiperAddress:          piperAddress,
+		AudioCacheDir:         audioCacheDir,
 	}, nil
 }
 
@@ -88,4 +90,17 @@ func corsAllowedOrigins() []string {
 		origins[i] = strings.TrimSpace(origin)
 	}
 	return origins
+}
+
+// corsAllowLocalNetwork lê CORS_ALLOW_LOCAL_NETWORK — opt-in explícito (não
+// hardcoda nenhum IP) pra aceitar, além de CORS_ALLOWED_ORIGINS, qualquer
+// origin http:// cujo host seja um IP de rede privada (RFC1918,
+// net.IP.IsPrivate) ou loopback — pedido do usuário pra testar o `web` a
+// partir do celular na mesma Wi-Fi sem precisar fixar o IP da máquina (que
+// muda a cada rede/DHCP). Default false: sem essa env var, o comportamento
+// de CORS não muda em nada — é puramente aditivo e pensado só pra dev local,
+// nunca deveria ser setado em produção.
+func corsAllowLocalNetwork() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("CORS_ALLOW_LOCAL_NETWORK")))
+	return v == "true" || v == "1"
 }

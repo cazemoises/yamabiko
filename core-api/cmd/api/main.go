@@ -67,7 +67,7 @@ func main() {
 	scenariosRepo := scenarios.NewPostgresRepository(pool)
 	scenariosHandler := scenarios.NewHandler(scenariosRepo, exercisesRepo)
 
-	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins)
+	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins, cfg.CORSAllowLocalNetwork)
 
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
