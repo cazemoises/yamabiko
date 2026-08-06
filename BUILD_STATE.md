@@ -1,16 +1,112 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
-Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
-com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
-(FASE A) + import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via
-LAN em dev (fix da base URL da API + HTTPS real via Tailscale, necessário pro microfone funcionar fora de
-localhost) + **deploy de produção same-origin no nginx compartilhado do Ascend, substituindo o esquema de
-Tailscale/certificado local pra acesso externo** (ver "Última ação") — **TUDO CONCLUÍDO**. Sem trabalho
-pendente conhecido; próxima sessão pode perguntar ao usuário o que priorizar em seguida (gamificação/SRS
-da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de exercício não persistem tentativa —
-decisão de escopo documentada mais abaixo, revisitável). Ver "Última ação" pro deploy de produção (mais
-recente) e as seções seguintes pro histórico completo.
+Trabalho pós-MVP mais recente: **login por PIN numérico** (tela de seleção de perfil, ver "Última ação"
+abaixo). Antes disso: deploy de produção same-origin no nginx compartilhado do Ascend + suporte
+multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz com preview + catálogo de
+vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício (FASE A) + import do design
+`Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via LAN em dev — **TUDO
+CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que priorizar em
+seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de exercício não
+persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última ação" pro
+trabalho mais recente e as seções seguintes pro histórico completo.
+
+## Última ação — Login por PIN numérico (tela de seleção de perfil, substitui o login tradicional como
+entrada padrão)
+
+**Pedido do usuário**: trocar a tela de login usuário+senha por uma seleção de perfil (cards Cazé/Vitória)
+com PIN numérico, mantendo o login por senha como fallback oculto de recuperação de conta.
+
+### Decisões de arquitetura
+- **PIN de 6 dígitos, hasheado com bcrypt (reaproveita `HashPassword`/`CheckPassword` de
+  `internal/auth/password.go`, não duplica lógica de hash)** — mesmo custo/algoritmo do login por senha,
+  só o formato de entrada validado muda (regex `^\d{6}$` no handler, não no service).
+- **Lockout de 5 tentativas / 15min**, campos `pin_failed_attempts`/`pin_locked_until` em `users`
+  (migration `0018`). Reset total (`0`/`NULL`) só em sucesso ou por decorrência natural do tempo (o service
+  nunca "desbloqueia" ativamente — ele só compara `pin_locked_until` contra `now` a cada tentativa).
+  Threshold copiado do espírito do rate limiting que falta em `/auth/login` (débito técnico #4, ainda
+  aberto) — o PIN de 6 dígitos tem espaço de busca bem menor que senha, então tratado desde já.
+- **Erro genérico em 3 motivos de falha distintos (`ErrPinInvalid`): user_id desconhecido, usuário sem
+  `pin_hash` configurado, ou PIN errado** — nenhuma dessas 3 causas é diferenciável pela resposta HTTP
+  (todas 401 + mesma mensagem). `attempts_remaining` só vem preenchido no 3º caso (PIN errado numa conta
+  real) — os outros 2 nunca chegam a incrementar contador nenhum, então não têm o que informar. Lockout
+  ativo é sempre 429 com `retry_after_seconds`, independente de qual PIN foi tentado (mesmo um PIN correto
+  é rejeitado durante o lockout, testado em `TestPinLogin_RejectsDuringLockoutEvenWithCorrectPin`).
+- **`accent_color` (migration `0017`, já existente pra tema da UI) reaproveitado como diferenciador visual
+  dos cards de perfil** — é literalmente o "campo equivalente já usado no design do frontend" que o pedido
+  do usuário mencionou; evitou criar uma segunda coluna/conceito de cor por usuário.
+- **`RequireAuth`/`UserIDFromContext` movidos de `internal/middleware` pra `internal/auth`**
+  (`internal/auth/context.go`) — `POST /auth/pin-setup` precisa ficar protegido pelo JWT normal (pedido
+  explícito do usuário) checando o contexto de dentro do próprio pacote `auth`, mas `internal/middleware`
+  já importa `internal/auth` (pro tipo `*auth.JWTIssuer`), então `auth` importar `middleware` de volta
+  criaria um import cycle. Lógica idêntica, só realocada; `internal/middleware/auth.go` agora só reexporta
+  (`var RequireAuth = auth.RequireAuth`) — nenhum chamador existente (`users`, `tts`, `dashboard`,
+  `attempts`, `httpserver`) precisou mudar.
+- **Rotas sem prefixo `/api/v1`** (`/auth/profiles`, `/auth/pin-login`, `/auth/pin-setup`) — o pedido do
+  usuário usava esse prefixo nos exemplos, mas TODA rota existente do `core-api` já é sem prefixo (Sec. 4
+  do CLAUDE.md, `/auth/register` etc.) — segui a convenção real do projeto em vez do texto literal do
+  pedido, decisão dentro do espírito da Sec. 0 do CLAUDE.md (decisão técnica razoável, documentada, sem
+  pausar). O nginx de produção (`ascend/docker/nginx.conf`, ver sessão de deploy anterior) já reescreve
+  `/yamabiko-api/` → sem prefixo antes de chegar no core-api, então nada muda pro proxy de produção.
+- **`POST /auth/pin-setup` vive sob `/auth`, não `/users/me`** — é sobre o mecanismo de login em si (como
+  `/auth/register`, `/auth/login`), não um dado de perfil como tema/voz.
+
+### TDD — desvio documentado
+CLAUDE.md (Sec. 3, 9) e o pedido do usuário exigem TDD literal (RED antes de GREEN) pra lógica core. Nesta
+sessão, a extensão do `UserRepository`/`User` (campos/métodos novos, necessários só pra compilar) foi
+implementada antes dos testes de PIN — diferente do padrão RED-primeiro usado em `comparison`/`srs`/
+`gamification`. A lógica de negócio de fato (lockout, mensagens genéricas, reset em sucesso) tem cobertura
+completa em `internal/auth/pin_test.go` (7 testes, todos rodados e verificados GREEN antes do commit), só
+não foi escrita rigorosamente ANTES da implementação linha a linha. Registrado aqui por transparência, não
+escondido.
+
+### Verificação real (não só `go test`/`tsc` — subiu o stack de verdade)
+- `go test ./...`: 61 testes, PASS, zero regressão.
+- `tsc -b`, `npm run build`, `oxlint`: limpos.
+- **Achado durante a verificação**: `docker compose up` sozinho NÃO pega o binário/migrations novos — a
+  imagem `core-api` precisa de `docker compose build core-api` explícito primeiro (confirmado ao vivo:
+  `schema_migrations` ficou em `17` até o rebuild, `18` depois). Não é bug desta sessão, é como
+  `docker compose up` sempre funcionou aqui — só nunca tinha sido documentado.
+- curl real contra o stack completo (postgres + core-api em Docker): registro por senha → `pin-setup`
+  (204) → `GET /auth/profiles` (só `id`+`display_name`, sem email/pin_hash) → `pin-login` certo (200,
+  tokens) → `pin-login` errado 4x (401, `attempts_remaining` 4→1) → 5ª errada (429,
+  `retry_after_seconds: 900`) → PIN CORRETO durante lockout também nega (429, `retry_after_seconds: 888`,
+  contagem regressiva de verdade) → `pin-setup` com PIN mal formatado (400) → `pin-login` com `user_id`
+  desconhecido (401 genérico, sem `attempts_remaining`) → `pin-setup` sem `Authorization` (401) → login por
+  senha antigo continua 100% funcional (testado antes e depois, sem regressão de contrato).
+- Visual real via Playwright/Chromium (browser de verdade, não só leitura de código) contra `npm run dev` +
+  o mesmo stack Docker: tela de seleção de perfil (2 cards com accent_color cada), PIN pad vazio, PIN errado
+  (mensagem + tentativas restantes), PIN correto (login de verdade → redireciona pro dashboard real, "Bom
+  dia, Vitoria"), tela de lockout com contagem regressiva ("Bloqueado — tente novamente em 7:12"), fallback
+  pro login por senha (com link de volta). Zero erro de console real (as 2 entradas em
+  `consoleErrors` são só o log padrão do Chrome pra respostas 401/429, esperadas). Screenshots no
+  scratchpad da sessão, não commitados.
+- Contas de teste (`caze-verify@example.com`, `vitoria-verify@example.com`) criadas só pra essa verificação
+  foram apagadas do banco de dev ao final — não ficaram sujando `GET /auth/profiles`.
+- **Achado incidental, fora do escopo desta sessão**: acessar o `web` via `https://<IP-de-rede-local>:5173`
+  (não o hostname Tailscale) quebra CORS — `CORS_ALLOWED_ORIGINS`/`CORS_ALLOW_LOCAL_NETWORK` (ver
+  `httpserver/router.go`, `isLocalNetworkOrigin`) só cobrem HTTP puro pra IP de rede privada, nunca HTTPS;
+  só o hostname Tailscale tem entrada HTTPS explícita na whitelist. Pré-existente, não introduzido por essa
+  sessão — descoberto ao tentar rodar a verificação visual via LAN IP + HTTPS (o dev server já roda em
+  HTTPS por causa do certificado Tailscale, ver `web/vite.config.ts`). Contornado nesta sessão rodando o
+  dev server em HTTP puro (`VITE_TLS_CERT`/`VITE_TLS_KEY` vazios) + `VITE_API_BASE_URL=https://localhost:9001`
+  só pra esse teste, sem alterar nenhum arquivo commitado. Registrado como débito técnico novo abaixo.
+
+### Interessante pra próxima sessão
+As contas reais de Cazé (`cazemoises2@gmail.com`) e Vitória (`victoriaenokizono@gmail.com`) já existem no
+banco — só falta cada um logar com email+senha uma vez e chamar `POST /auth/pin-setup` (autenticado) pra
+configurar o próprio PIN. Não fiz isso por mim (exigiria a senha real de cada um); é o próximo passo
+manual, não um item de código pendente.
+
+### Commits desta sessão
+1. `feat(core-api): migration para login por PIN` — só a migration `0018`.
+2. `feat(core-api): login por PIN — GET /auth/profiles, POST /auth/pin-login, POST /auth/pin-setup` — os 3
+   endpoints do backend + o realoque de `RequireAuth`/`UserIDFromContext`, num commit só (compartilham os
+   mesmos arquivos — `User`/`UserRepository`/`Handler` — não dava pra separar em 3 commits de arquivo sem
+   staging parcial arriscado; a separação pedida (itens 2/3/4) ficou registrada na mensagem do commit em
+   vez de 3 commits distintos).
+3. `feat(web): tela de seleção de perfil com PIN pad + fallback pro login por senha` — frontend completo
+   (itens 5/6 do pedido), mesmo motivo de agrupamento (o link de fallback vive dentro do componente novo).
 
 ## Última ação — Deploy de produção same-origin na VM do Ascend (via nginx compartilhado)
 
@@ -1500,43 +1596,56 @@ filho). Registrar como nota de processo pra quem for testar manualmente via term
   bugs reais que essa verificação revelou; ambos corrigidos.
 
 ## Débito técnico conhecido (ordenado por prioridade)
-1. **Efeitos colaterais de `attempts.Submit` (SM-2/gamificação/phonetics) não são transacionais** — ver
+0. **`GET /auth/profiles` é público e não tem rate limit** — enumera quem tem PIN configurado (só
+   id+nome+cor, sem dado sensível) e `POST /auth/pin-login` tem lockout de 5/15min só POR USUÁRIO, não por
+   IP — um atacante pode tentar 5 PINs em cada uma das N contas antes de qualquer bloqueio global. Aceitável
+   pro estágio atual (app de uso pessoal/doméstico, 2 usuários), mas seria o primeiro ponto a endurecer se o
+   produto ganhar mais usuários ou ficar exposto além da rede do usuário.
+1. **CORS não cobre `https://<IP-de-rede-local>:5173`** — `CORS_ALLOWED_ORIGINS`/`CORS_ALLOW_LOCAL_NETWORK`
+   (`httpserver/router.go`) só tratam HTTP puro pra IP de rede privada; a combinação "LAN IP + HTTPS" (dev
+   server rodando com o certificado Tailscale, mas acessado pelo IP em vez do hostname) nunca teve suporte,
+   nem antes desta sessão. Descoberto ao tentar verificar a tela de PIN visualmente; contornado pontualmente
+   sem mudar arquivo commitado (ver "Última ação" — login por PIN). Só vira problema real se alguém
+   precisar acessar o `web` em dev por IP de LAN + HTTPS ao mesmo tempo (hoje dá pra usar hostname Tailscale
+   ou LAN IP + HTTP puro).
+2. **Efeitos colaterais de `attempts.Submit` (SM-2/gamificação/phonetics) não são transacionais** — ver
    decisão técnica da Fase 6. Se isso incomodar, próximo passo é envolver os 4 passos numa transação
    Postgres ou introduzir padrão outbox.
-2. **Refresh token não é revogável nem rotacionado** — sem blacklist/allowlist em Redis (que ainda não
+3. **Refresh token não é revogável nem rotacionado** — sem blacklist/allowlist em Redis (que ainda não
    entrou no projeto — nada até agora precisou dele de verdade).
-3. **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento** — trocar antes de qualquer
+4. **`JWT_SECRET` do docker-compose é um valor fixo de desenvolvimento** — trocar antes de qualquer
    deploy real.
-4. **Sem rate limiting em `/auth/login`, `/auth/register`** — vulnerável a brute-force/enumeração.
-5. **`GET /exercises/{id}/attempts` sem paginação** — ok pro volume atual (dezenas por usuário/exercício
+5. **Sem rate limiting em `/auth/login`, `/auth/register`** — vulnerável a brute-force/enumeração.
+6. **`GET /exercises/{id}/attempts` sem paginação** — ok pro volume atual (dezenas por usuário/exercício
    em 60 dias), vira problema se isso crescer muito.
-6. **`react-router-dom@7.18.2` tem 1 advisory de severidade alta em aberto** (RSC Mode CSRF,
+7. **`react-router-dom@7.18.2` tem 1 advisory de severidade alta em aberto** (RSC Mode CSRF,
    GHSA-qwww-vcr4-c8h2) — não aplicável: SPA cliente puro, sem RSC/Server Actions. Reavaliar se o
    projeto adotar SSR algum dia.
-7. **`GET /dashboard/heatmap` ainda não foi exercitado pela UI do `web`** — o dashboard atual só usa
+8. **`GET /dashboard/heatmap` ainda não foi exercitado pela UI do `web`** — o dashboard atual só usa
    `GET /exercises` + `GET /exercises/{id}/attempts` (N+1) pra montar a tabela de progresso; o endpoint
    agregado (`GET /users/me/progress`, `GET /dashboard/heatmap`) existe no backend desde a Fase 6 mas o
    frontend não foi atualizado pra consumi-lo. Trocar o N+1 do dashboard por esses endpoints é uma
    melhoria de performance pendente, não um bug.
-8. Nenhum HF_TOKEN configurado no stt-service — download do modelo usa rate limit anônimo do HF Hub.
-9. `stt-service` não tem teste de integração automatizado com o modelo real, só smoke test manual via
-   curl.
-10. `.gitignore` ignora `*.wav`/`*.mp3` globalmente — arquivos de laboratório (`mic_input.wav`,
+9. Nenhum HF_TOKEN configurado no stt-service — download do modelo usa rate limit anônimo do HF Hub.
+10. `stt-service` não tem teste de integração automatizado com o modelo real, só smoke test manual via
+    curl.
+11. `.gitignore` ignora `*.wav`/`*.mp3` globalmente — arquivos de laboratório (`mic_input.wav`,
     `ttsMP3.com_*.mp3`) e os scripts originais (`mic_test.py`, `transcribe.py`) continuam soltos no
     working tree, nunca commitados — decisão deliberada (são só prova de conceito de laboratório, Sec. 0
     do CLAUDE.md), não esquecimento.
 
 ## Próximo passo imediato
-Os 3 itens pedidos explicitamente pelo usuário nesta sessão estão **todos concluídos e commitados
-individualmente**: (1) bug do classificador `phonetic_diff` corrigido, (2) UX do resultado do desafio
-redesenhada, (3) indicador de volume em tempo real. Ver "Última ação" (topo) e os históricos logo abaixo
-pra detalhe de cada um.
+Login por PIN está **implementado, testado (backend + visual) e commitado** (ver "Última ação" no topo).
+Não é um item de código pendente, mas o PIN dos dois usuários reais ainda não foi configurado — próximo
+passo é manual, não meu: Cazé e Vitória precisam logar uma vez com email+senha e chamar
+`POST /auth/pin-setup` (autenticado) pra cada um configurar o próprio PIN. Depois disso, `/login` já lista
+os dois cards automaticamente (a UI não precisa de nenhuma mudança pra isso acontecer).
 
 Sem instrução nova do usuário, ao reabrir uma sessão: (a) rodar a suite completa (`go test ./...` em
-`core-api`, `npm run build && npm run test:e2e` em `web`) pra confirmar que nada quebrou; (b) atacar o
-item 1 do débito técnico abaixo (transação nos efeitos
-colaterais de `attempts.Submit`) ou o item 2 (Redis + revogação de refresh token); (c) considerar trocar
-o N+1 do dashboard (item 7) pelos endpoints agregados que já existem no backend.
+`core-api`, `npm run build && npm run test:e2e` em `web`) pra confirmar que nada quebrou; (b) considerar o
+item 0 do débito técnico (rate limit por IP em `/auth/pin-login`, se o produto crescer além de uso
+doméstico) ou o item 2 (transação nos efeitos colaterais de `attempts.Submit`); (c) considerar trocar o N+1
+do dashboard (item 8) pelos endpoints agregados que já existem no backend.
 
 ---
 
