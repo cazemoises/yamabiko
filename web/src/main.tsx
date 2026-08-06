@@ -6,7 +6,11 @@ import App from "./App.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    {/* import.meta.env.BASE_URL reflete `base` do vite.config.ts — '/' em
+        dev, '/yamabiko/' no build de produção (ver web/Dockerfile.prod).
+        Sem isso as rotas do React Router ignorariam o prefixo e navegação
+        interna (Link/navigate) quebraria same-origin em /yamabiko/*. */}
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <App />
     </BrowserRouter>
   </StrictMode>,

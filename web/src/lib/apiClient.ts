@@ -57,7 +57,11 @@ async function refreshAccessToken(): Promise<string> {
 
 function redirectToLogin(): void {
   clearTokens();
-  window.location.assign("/login");
+  // window.location, ao contrário de <Link>/navigate() do React Router,
+  // ignora o `basename` do BrowserRouter — precisa montar o caminho com
+  // import.meta.env.BASE_URL manualmente (ver main.tsx) pra funcionar sob
+  // /yamabiko/ em produção, não só na raiz.
+  window.location.assign(`${import.meta.env.BASE_URL}login`);
 }
 
 // requestRaw concentra a lógica de auth + retry de refresh compartilhada por

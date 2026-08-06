@@ -51,6 +51,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Same-origin deploy no nginx compartilhado do Ascend (ver
+    // BUILD_STATE.md): o app fica servido em /yamabiko/, não na raiz, então
+    // todo asset gerado pelo build (JS, CSS, ícones) precisa desse prefixo
+    // nos <script>/<link> do index.html — é isso que `base` controla. Sem
+    // VITE_BASE_PATH setado (dev normal, ou preview local), cai pro '/'
+    // de sempre. Passado via build ARG em web/Dockerfile.prod, não hardcoded
+    // aqui, porque dev/e2e nunca devem rodar sob esse prefixo.
+    base: env.VITE_BASE_PATH || '/',
     server: {
       // host: true == '0.0.0.0' — o dev server escuta em todas as interfaces
       // de rede, não só localhost, pra dar pra abrir o app de outro

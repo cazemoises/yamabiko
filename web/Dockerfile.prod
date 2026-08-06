@@ -1,0 +1,28 @@
+# Não serve os arquivos (ao contrário do web/Dockerfile do Ascend, que
+# termina em nginx) — só builda e publica o dist/ num volume Docker externo
+# compartilhado, que o container `web`/nginx do Ascend monta read-only em
+# /usr/share/nginx/html/yamabiko (ver ascend/docker-compose.yml e
+# BUILD_STATE.md pra decisão de arquitetura completa). Same-origin via
+# nginx compartilhado, não um servidor HTTP próprio.
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY . .
+# VITE_BASE_PATH e VITE_API_BASE_URL só existem nesta imagem de produção —
+# dev (`npm run dev`) e os testes e2e nunca setam essas ARGs, então
+# continuam servindo em '/' com API relativa ao host que carregou a página
+# (ver web/vite.config.ts e web/src/lib/apiClient.ts).
+ARG VITE_BASE_PATH=/
+ARG VITE_API_BASE_URL=
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+RUN npx tsc -b && npx vite build
+
+FROM alpine:3.20
+WORKDIR /publish
+COPY --from=builder /app/dist ./dist
+# /out é o mountpoint do volume externo yamabiko_web_dist — este container
+# roda uma vez (`docker compose run --rm web-static`) e sai; nunca fica de
+# pé nem expõe porta nenhuma.
+CMD ["sh", "-c", "rm -rf /out/* && cp -r ./dist/. /out/ && echo yamabiko-web-static: published to /out"]
