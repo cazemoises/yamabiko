@@ -3,6 +3,7 @@ package auth_test
 import (
 	"context"
 	"errors"
+	"sort"
 	"testing"
 	"time"
 
@@ -40,6 +41,36 @@ func (f *fakeRepo) FindByID(_ context.Context, id uuid.UUID) (*auth.User, error)
 		return nil, auth.ErrUserNotFound
 	}
 	return u, nil
+}
+
+func (f *fakeRepo) ListPinEnabledProfiles(_ context.Context) ([]auth.PinProfile, error) {
+	profiles := make([]auth.PinProfile, 0)
+	for _, u := range f.byID {
+		if u.PinHash != nil {
+			profiles = append(profiles, auth.PinProfile{ID: u.ID, DisplayName: u.Name, AccentColor: u.AccentColor})
+		}
+	}
+	sort.Slice(profiles, func(i, j int) bool { return profiles[i].DisplayName < profiles[j].DisplayName })
+	return profiles, nil
+}
+
+func (f *fakeRepo) UpdatePinAuthState(_ context.Context, userID uuid.UUID, failedAttempts int, lockedUntil *time.Time) error {
+	u, ok := f.byID[userID]
+	if !ok {
+		return auth.ErrUserNotFound
+	}
+	u.PinFailedAttempts = failedAttempts
+	u.PinLockedUntil = lockedUntil
+	return nil
+}
+
+func (f *fakeRepo) SetPinHash(_ context.Context, userID uuid.UUID, hash string) error {
+	u, ok := f.byID[userID]
+	if !ok {
+		return auth.ErrUserNotFound
+	}
+	u.PinHash = &hash
+	return nil
 }
 
 func newTestService() (*auth.Service, *fakeRepo) {

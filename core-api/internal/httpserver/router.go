@@ -42,9 +42,20 @@ func NewRouter(
 	})
 
 	r.Route("/auth", func(r chi.Router) {
+		r.Get("/profiles", authHandler.Profiles)
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
 		r.Post("/refresh", authHandler.Refresh)
+		r.Post("/pin-login", authHandler.PinLogin)
+
+		// pin-setup fica sob /auth (não /users/me) porque é sobre o
+		// mecanismo de login em si, não um dado de perfil — mas exige o
+		// mesmo Authorization: Bearer que o resto das rotas autenticadas
+		// (Sec. 4 do pedido do usuário: "protegido pelo JWT normal").
+		r.Group(func(r chi.Router) {
+			r.Use(appmiddleware.RequireAuth(tokens))
+			r.Post("/pin-setup", authHandler.PinSetup)
+		})
 	})
 
 	// Todas as rotas abaixo exigem Authorization: Bearer {access_token} (Sec. 4 do CLAUDE.md).

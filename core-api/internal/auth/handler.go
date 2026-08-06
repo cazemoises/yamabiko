@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -101,4 +105,94 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, accessTokenResponse{AccessToken: accessToken})
+}
+
+// Profiles serve GET /auth/profiles — público, projeção mínima (Sec. 2 do
+// pedido do usuário).
+func (h *Handler) Profiles(w http.ResponseWriter, r *http.Request) {
+	profiles, err := h.service.Profiles(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "erro ao buscar perfis")
+		return
+	}
+	writeJSON(w, http.StatusOK, profiles)
+}
+
+type pinLoginRequest struct {
+	UserID string `json:"user_id"`
+	Pin    string `json:"pin"`
+}
+
+// PinLogin serve POST /auth/pin-login (Sec. 3 do pedido do usuário).
+func (h *Handler) PinLogin(w http.ResponseWriter, r *http.Request) {
+	var req pinLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "user_id inválido")
+		return
+	}
+
+	tokens, err := h.service.PinLogin(r.Context(), userID, req.Pin, time.Now())
+	if err != nil {
+		var lockedErr *ErrPinLocked
+		if errors.As(err, &lockedErr) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{
+				"error":               "conta temporariamente bloqueada por tentativas de PIN incorretas",
+				"retry_after_seconds": int(lockedErr.RetryAfter.Seconds()),
+			})
+			return
+		}
+		var invalidErr *ErrPinInvalid
+		if errors.As(err, &invalidErr) {
+			body := map[string]any{"error": "PIN inválido"}
+			if invalidErr.AttemptsRemaining != nil {
+				body["attempts_remaining"] = *invalidErr.AttemptsRemaining
+			}
+			writeJSON(w, http.StatusUnauthorized, body)
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "erro ao autenticar")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tokens)
+}
+
+type pinSetupRequest struct {
+	Pin string `json:"pin"`
+}
+
+var pinFormatPattern = regexp.MustCompile(`^\d{6}$`)
+
+// PinSetup serve POST /auth/pin-setup — autenticado pelo login por senha
+// existente (Sec. 4 do pedido do usuário), única porta de entrada pra
+// configurar ou resetar o PIN.
+func (h *Handler) PinSetup(w http.ResponseWriter, r *http.Request) {
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "usuário não autenticado")
+		return
+	}
+
+	var req pinSetupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "corpo inválido")
+		return
+	}
+	if !pinFormatPattern.MatchString(req.Pin) {
+		writeError(w, http.StatusBadRequest, "pin precisa ter exatamente 6 dígitos numéricos")
+		return
+	}
+
+	if err := h.service.SetPin(r.Context(), userID, req.Pin); err != nil {
+		writeError(w, http.StatusInternalServerError, "erro ao salvar PIN")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

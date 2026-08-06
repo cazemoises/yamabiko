@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -58,6 +59,57 @@ func (s *Service) Login(ctx context.Context, email, password string) (*TokenPair
 		return nil, ErrInvalidCredentials
 	}
 	return s.tokens.IssueTokenPair(user.ID)
+}
+
+// Profiles alimenta GET /auth/profiles — só perfis com PIN configurado.
+func (s *Service) Profiles(ctx context.Context) ([]PinProfile, error) {
+	return s.repo.ListPinEnabledProfiles(ctx)
+}
+
+// PinLogin implementa o fluxo da Sec. 3 do pedido do usuário. `now` é
+// parâmetro explícito (não time.Now() interno) pra deixar
+// evaluatePinAttempt/o fluxo de lockout testável sem tempo de parede —
+// mesmo padrão de srs.Schedule.
+func (s *Service) PinLogin(ctx context.Context, userID uuid.UUID, pin string, now time.Time) (*TokenPair, error) {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil || user.PinHash == nil {
+		return nil, &ErrPinInvalid{}
+	}
+
+	if user.PinLockedUntil != nil && user.PinLockedUntil.After(now) {
+		return nil, &ErrPinLocked{RetryAfter: user.PinLockedUntil.Sub(now)}
+	}
+
+	correct := CheckPassword(*user.PinHash, pin)
+	outcome := evaluatePinAttempt(user.PinFailedAttempts, correct, now)
+
+	if outcome.success {
+		if err := s.repo.UpdatePinAuthState(ctx, userID, 0, nil); err != nil {
+			return nil, err
+		}
+		return s.tokens.IssueTokenPair(userID)
+	}
+
+	if err := s.repo.UpdatePinAuthState(ctx, userID, outcome.newFailedAttempts, outcome.newLockedUntil); err != nil {
+		return nil, err
+	}
+	if outcome.locked {
+		return nil, &ErrPinLocked{RetryAfter: pinLockDuration}
+	}
+	remaining := outcome.attemptsRemaining
+	return nil, &ErrPinInvalid{AttemptsRemaining: &remaining}
+}
+
+// SetPin serve POST /auth/pin-setup — só alcançável autenticado por senha
+// (Sec. 5 do pedido do usuário: senha continua sendo a porta única de
+// configuração/reset de PIN). Validação de formato (6 dígitos) é
+// responsabilidade do Handler, não do Service.
+func (s *Service) SetPin(ctx context.Context, userID uuid.UUID, pin string) error {
+	hash, err := HashPassword(pin)
+	if err != nil {
+		return err
+	}
+	return s.repo.SetPinHash(ctx, userID, hash)
 }
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (string, error) {
