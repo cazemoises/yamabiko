@@ -6,6 +6,8 @@ import { AudioExercise } from "./AudioExercise";
 import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
 import { WordOrderExercise } from "./WordOrderExercise";
 import { VerbConjugationExercise } from "./VerbConjugationExercise";
+import { TrueFalseExercise } from "./TrueFalseExercise";
+import { MatchingPairsExercise } from "./MatchingPairsExercise";
 import { TopBar } from "../../components/layout/TopBar";
 
 // Shell compartilhado por todo exercise_type (Frames 4-19): topbar,
@@ -132,6 +134,10 @@ function ExerciseBody({
       return <WordOrderExercise exercise={exercise} onAnswered={onAnswered} />;
     case "verb_conjugation":
       return <VerbConjugationExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "true_false":
+      return <TrueFalseExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "matching_pairs":
+      return <MatchingPairsExercise exercise={exercise} onAnswered={onAnswered} />;
     case "audio_pronunciation":
     case undefined:
       return (

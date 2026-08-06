@@ -623,6 +623,12 @@ textarea {
   color: var(--pass);
 }
 
+.matching-item.incorrect {
+  border: 1.5px solid var(--fail);
+  background: var(--fail-soft);
+  color: var(--fail);
+}
+
 /* ---------- verdadeiro/falso ---------- */
 
 .true-false-statement {
@@ -664,6 +670,22 @@ textarea {
   background: var(--accent-base);
   color: var(--accent-on);
   border-color: var(--accent-base);
+}
+
+.true-false-button.correct {
+  background: var(--pass-soft);
+  color: var(--pass);
+  border-color: var(--pass);
+}
+
+.true-false-button.incorrect {
+  background: var(--fail-soft);
+  color: var(--fail);
+  border-color: var(--fail);
+}
+
+.true-false-button.dimmed {
+  color: var(--text-faint);
 }
 
 /* ---------- texto livre / ditado ---------- */
