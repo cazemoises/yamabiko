@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
 
 const SCENARIO_ID = "scn-1";
 
@@ -65,6 +65,7 @@ test("percorre um cenário completo do início ao fim sem voltar pra lista entre
     await route.fulfill({ status: 200, json: passResult(EXERCISE_2.expected_transcript) });
   });
 
+  await mockProfile(page);
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto(`/exercises/${EXERCISE_1.id}`);

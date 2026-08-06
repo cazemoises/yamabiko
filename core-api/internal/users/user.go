@@ -19,4 +19,6 @@ type Profile struct {
 	Badges            []string   `json:"badges"`
 	PreferredVoiceJA  *string    `json:"preferred_voice_ja,omitempty"`
 	PreferredVoiceEN  *string    `json:"preferred_voice_en,omitempty"`
+	Theme             *string    `json:"theme,omitempty"`
+	AccentColor       *string    `json:"accent_color,omitempty"`
 }

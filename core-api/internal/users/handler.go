@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 
 	"github.com/yamabiko/core-api/internal/exercises"
 	appmiddleware "github.com/yamabiko/core-api/internal/middleware"
@@ -131,6 +132,55 @@ func (h *Handler) UpdateVoicePreference(w http.ResponseWriter, r *http.Request) 
 		default:
 			writeError(w, http.StatusInternalServerError, "erro ao salvar preferência de voz")
 		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type appearanceRequest struct {
+	// Ponteiro: nil = campo ausente do request, não mexe nesse valor (PATCH
+	// parcial — pedido do usuário, tema e accent color são independentes um
+	// do outro). String vazia = reseta pro default (mesma convenção de
+	// voice_id="" em UpdateVoicePreference).
+	Theme       *string `json:"theme"`
+	AccentColor *string `json:"accent_color"`
+}
+
+var hexColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// UpdateAppearance serve PATCH /users/me/appearance — tema
+// (""/"light"/"dark") e accent color (""/"mono"/"#RRGGBB") persistidos por
+// usuário (Sec. pedida pelo usuário: "vire preferência de usuário real").
+func (h *Handler) UpdateAppearance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := appmiddleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "usuário não autenticado")
+		return
+	}
+
+	var req appearanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "corpo da requisição inválido")
+		return
+	}
+
+	if req.Theme != nil && *req.Theme != "" && *req.Theme != "light" && *req.Theme != "dark" {
+		writeError(w, http.StatusBadRequest, "theme precisa ser \"light\", \"dark\" ou vazio (reseta pro padrão do sistema)")
+		return
+	}
+	if req.AccentColor != nil && *req.AccentColor != "" && *req.AccentColor != "mono" && !hexColorPattern.MatchString(*req.AccentColor) {
+		writeError(w, http.StatusBadRequest, "accent_color precisa ser \"mono\", um hex #RRGGBB ou vazio (reseta pro padrão)")
+		return
+	}
+
+	update := AppearanceUpdate{Theme: req.Theme, AccentColor: req.AccentColor}
+	if err := h.repo.UpdateAppearance(r.Context(), userID, update); err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "usuário não encontrado")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "erro ao salvar preferência de aparência")
 		return
 	}
 

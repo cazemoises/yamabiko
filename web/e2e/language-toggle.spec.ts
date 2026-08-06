@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
 
 const JA_EXERCISE = {
   id: "ex-ja",
@@ -32,6 +32,7 @@ test("toggle JA/EN filtra a lista por idioma e reflete no botão de pronúncia e
     await route.fulfill({ status: 200, json: [JA_EXERCISE] });
   });
 
+  await mockProfile(page);
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto("/exercises");
@@ -66,6 +67,7 @@ test("exercício em inglês mostra o botão de pronúncia por áudio real e não
     });
   });
 
+  await mockProfile(page);
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto(`/exercises/${EN_EXERCISE.id}`);

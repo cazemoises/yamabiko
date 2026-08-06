@@ -1,11 +1,76 @@
 import { useEffect, useRef, useState } from "react";
 import { getVoicePreview, listVoices, type Voice } from "../tts/api";
 import { getProfile, updateVoicePreference, type Profile } from "../users/api";
+import { ACCENT_PRESETS, useAppearance } from "../users/AppearanceContext";
 
 const LANGUAGES = [
   { value: "ja-JP", label: "Japonês" },
   { value: "en-US", label: "Inglês" },
 ];
+
+const THEME_OPTIONS = [
+  { value: "", label: "Sistema" },
+  { value: "light", label: "Claro" },
+  { value: "dark", label: "Escuro" },
+];
+
+// Não é um frame do design (o Yamabiko.dc.html só tem um painel de Tweaks
+// pro preview do PRÓPRIO design, não uma tela de app pro usuário final) —
+// composição nossa sobre os mesmos tokens/primitivos (.theme-toggle já
+// existia pro toggle de idioma da voz), documentada como decisão em
+// BUILD_STATE.md.
+function AppearanceSection() {
+  const { theme, accentColor, setTheme, setAccentColor } = useAppearance();
+  const [customHex, setCustomHex] = useState("");
+
+  function applyCustomHex(): void {
+    if (/^#[0-9a-fA-F]{6}$/.test(customHex)) setAccentColor(customHex);
+  }
+
+  return (
+    <div className="appearance-section">
+      <span className="section-title">Aparência</span>
+
+      <div className="theme-toggle" role="group" aria-label="Tema">
+        {THEME_OPTIONS.map((opt) => (
+          <button
+            key={opt.value || "system"}
+            type="button"
+            className={theme === opt.value ? "theme-toggle-button active" : "theme-toggle-button"}
+            aria-pressed={theme === opt.value}
+            onClick={() => setTheme(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="accent-swatches">
+        {ACCENT_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className={accentColor === preset.value ? "accent-swatch selected" : "accent-swatch"}
+            style={{ background: preset.swatch }}
+            aria-label={`Acento ${preset.label}`}
+            aria-pressed={accentColor === preset.value}
+            onClick={() => setAccentColor(preset.value)}
+          />
+        ))}
+        <input
+          type="text"
+          className="accent-custom-input"
+          placeholder="#RRGGBB"
+          value={customHex}
+          onChange={(e) => setCustomHex(e.target.value)}
+          onBlur={applyCustomHex}
+          onKeyDown={(e) => e.key === "Enter" && applyCustomHex()}
+          aria-label="Cor de acento customizada"
+        />
+      </div>
+    </div>
+  );
+}
 
 // Frame 8 (Configurações de Voz) — cada linha tem o nome da voz (já
 // descritivo, ex: "Voz Feminina Grave" — o catálogo curado não tem um
@@ -92,9 +157,12 @@ export function VoiceSettingsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="page-title">Voz de referência</span>
+        <span className="page-title">Configurações</span>
       </div>
 
+      <AppearanceSection />
+
+      <span className="section-title">Voz de referência</span>
       <div className="theme-toggle" role="group" aria-label="Idioma da voz">
         {LANGUAGES.map((lang) => (
           <button

@@ -18,3 +18,30 @@ export async function seedTokensOnce(page: Page, accessToken: string, refreshTok
     { accessToken, refreshToken },
   );
 }
+
+// AppearanceProvider (App.tsx) busca GET /users/me em TODA página
+// autenticada, não só nas telas que mostram o perfil — sem mockar isso,
+// testes com token falso tomam 401 real do core-api, o interceptor de
+// refresh tenta renovar (também falha) e redireciona pra /login no meio do
+// teste, quebrando qualquer página que não seja sobre perfil/voz. Specs que
+// já mockam /users/me com um perfil específico (ex: voice-settings,
+// token-refresh) não precisam disso — só as que não têm nenhum interesse
+// no conteúdo do perfil, só querem que a chamada não derrube a sessão.
+export async function mockProfile(page: Page): Promise<void> {
+  await page.route(`${API_BASE_URL}/users/me`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: {
+        id: "e2e-user",
+        email: "e2e@example.com",
+        name: "E2E",
+        created_at: "2026-01-01T00:00:00Z",
+        current_sprint_day: 1,
+        xp_total: 0,
+        current_streak_days: 0,
+        longest_streak_days: 0,
+        badges: [],
+      },
+    });
+  });
+}

@@ -24,14 +24,14 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 func (r *PostgresRepository) FindProfileByID(ctx context.Context, id uuid.UUID) (*Profile, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT id, email, name, created_at, current_sprint_day, xp_total, current_streak_days, longest_streak_days,
-		        last_attempt_date, preferred_voice_ja, preferred_voice_en
+		        last_attempt_date, preferred_voice_ja, preferred_voice_en, theme, accent_color
 		 FROM users WHERE id = $1`,
 		id,
 	)
 	var p Profile
 	err := row.Scan(&p.ID, &p.Email, &p.Name, &p.CreatedAt, &p.CurrentSprintDay,
 		&p.XPTotal, &p.CurrentStreakDays, &p.LongestStreakDays, &p.LastAttemptDate,
-		&p.PreferredVoiceJA, &p.PreferredVoiceEN)
+		&p.PreferredVoiceJA, &p.PreferredVoiceEN, &p.Theme, &p.AccentColor)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
@@ -153,6 +153,46 @@ func (r *PostgresRepository) SetVoicePreference(ctx context.Context, userID uuid
 	}
 
 	tag, err := r.pool.Exec(ctx, query, userID, value)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// UpdateAppearance aplica um patch parcial (só os campos não-nil de
+// update são tocados) — monta o UPDATE dinamicamente em vez de sempre
+// setar as 2 colunas, pra um PATCH só de tema não sobrescrever o accent
+// salvo (e vice-versa).
+func (r *PostgresRepository) UpdateAppearance(ctx context.Context, userID uuid.UUID, update AppearanceUpdate) error {
+	var sets []string
+	var args []any
+	args = append(args, userID)
+
+	if update.Theme != nil {
+		var value *string
+		if *update.Theme != "" {
+			value = update.Theme
+		}
+		args = append(args, value)
+		sets = append(sets, fmt.Sprintf("theme = $%d", len(args)))
+	}
+	if update.AccentColor != nil {
+		var value *string
+		if *update.AccentColor != "" {
+			value = update.AccentColor
+		}
+		args = append(args, value)
+		sets = append(sets, fmt.Sprintf("accent_color = $%d", len(args)))
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $1", strings.Join(sets, ", "))
+	tag, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
 		return err
 	}

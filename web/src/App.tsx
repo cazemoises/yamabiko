@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { AppearanceProvider } from "./features/users/AppearanceContext";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { HomePage } from "./features/home/HomePage";
@@ -89,7 +90,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <AppearanceProvider>
+        <AppRoutes />
+      </AppearanceProvider>
     </AuthProvider>
   );
 }

@@ -16,6 +16,15 @@ var ErrUserNotFound = errors.New("usuário não encontrado")
 // — erro de validação do request, não falha de infra.
 var ErrUnsupportedVoiceLanguage = errors.New("users: idioma sem preferência de voz suportada")
 
+// AppearanceUpdate é um patch parcial (Sec. pedida pelo usuário: tema e
+// accent color independentes um do outro) — nil = campo não veio no
+// request, não mexe nesse valor; ponteiro pra string vazia = reseta pro
+// default (mesma convenção de voiceID="" em SetVoicePreference).
+type AppearanceUpdate struct {
+	Theme       *string
+	AccentColor *string
+}
+
 type Repository interface {
 	FindProfileByID(ctx context.Context, id uuid.UUID) (*Profile, error)
 	FindStatsByID(ctx context.Context, id uuid.UUID) (*gamification.UserStats, error)
@@ -27,4 +36,5 @@ type Repository interface {
 	// core-api/internal/tts/service.go).
 	GetVoicePreference(ctx context.Context, userID uuid.UUID, language string) (voiceID string, err error)
 	SetVoicePreference(ctx context.Context, userID uuid.UUID, language, voiceID string) error
+	UpdateAppearance(ctx context.Context, userID uuid.UUID, update AppearanceUpdate) error
 }

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
 
 const EXERCISE = {
   id: "ex-1",
@@ -34,6 +34,7 @@ test("resultado do desafio destaca a divergência, mostra romaji e explica em po
     await route.fulfill({ status: 200, json: ATTEMPT_RESULT });
   });
 
+  await mockProfile(page);
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto(`/exercises/${EXERCISE.id}`);

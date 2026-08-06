@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
 
 const EXERCISE = {
   id: "retry-ex-1",
@@ -29,6 +29,7 @@ test("erro -> retry -> acerto: 1 clique só entre ver o erro e voltar a gravar, 
     await route.fulfill({ status: 200, json: attemptCalls === 1 ? FAIL_RESULT : PASS_RESULT });
   });
 
+  await mockProfile(page);
   await seedTokensOnce(page, "valid-token", "valid-refresh-token");
   await page.goto(`/exercises/${EXERCISE.id}`);
   await expect(page.getByText(EXERCISE.prompt_pt)).toBeVisible();

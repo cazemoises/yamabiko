@@ -55,6 +55,7 @@ func NewRouter(
 			r.Get("/", usersHandler.Me)
 			r.Get("/progress", usersHandler.Progress)
 			r.Patch("/voice-preference", usersHandler.UpdateVoicePreference)
+			r.Patch("/appearance", usersHandler.UpdateAppearance)
 		})
 
 		r.Route("/exercises", func(r chi.Router) {
