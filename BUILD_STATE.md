@@ -5,10 +5,198 @@ Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) 
 com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
 (FASE A) + import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via
 LAN em dev (fix da base URL da API + HTTPS real via Tailscale, necessário pro microfone funcionar fora de
-localhost) — **TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário
-o que priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos
-novos de exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver
-"Última ação" pro fix do HTTPS/Tailscale v2 (mais recente) e as seções seguintes pro histórico completo.
+localhost) + **deploy de produção same-origin no nginx compartilhado do Ascend, substituindo o esquema de
+Tailscale/certificado local pra acesso externo** (ver "Última ação") — **TUDO CONCLUÍDO**. Sem trabalho
+pendente conhecido; próxima sessão pode perguntar ao usuário o que priorizar em seguida (gamificação/SRS
+da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de exercício não persistem tentativa —
+decisão de escopo documentada mais abaixo, revisitável). Ver "Última ação" pro deploy de produção (mais
+recente) e as seções seguintes pro histórico completo.
+
+## Última ação — Deploy de produção same-origin na VM do Ascend (via nginx compartilhado)
+
+**Pedido do usuário**: colocar o yamabiko-platform em produção reaproveitando a mesma VM onde o Ascend já
+roda (container `web` do Ascend mapeado em `8000:80`, exposto publicamente pelo Pangolin em
+`https://cazemoises-webserver.learnops.duckdns.org/`), sem pedir nenhuma mudança de infra ao responsável
+pela VM/Pangolin e sem publicar nenhuma porta nova no host (evitar conflito com `postgres:5432` e
+`redis:6379`, já usados pelo Ascend).
+
+### URL final de acesso
+`https://cazemoises-webserver.learnops.duckdns.org/yamabiko/` — frontend do yamabiko, servido pelo mesmo
+nginx que já serve o Ascend na raiz. Chamadas de API do frontend vão pra
+`https://cazemoises-webserver.learnops.duckdns.org/yamabiko-api/...`, proxied internamente pro core-api.
+
+### Decisão de arquitetura: same-origin via nginx compartilhado, não Tailscale/certificado local
+A sessão anterior (ver "Última ação — HTTPS via Tailscale v2" abaixo) resolveu acesso externo via
+certificado Let's Encrypt do Tailscale (`tailscale cert`), servindo o Vite dev server diretamente em HTTPS.
+Isso **deixa de ser necessário pro caso de uso de produção** agora que existe uma URL pública real
+via Pangolin: o browser fala HTTPS direto com `cazemoises-webserver.learnops.duckdns.org` (certificado
+público de verdade, não Tailscale), e nginx faz proxy same-origin internamente — resolve o mesmo problema
+raiz (getUserMedia exige secure context) sem depender de Tailscale estar ativo no dispositivo cliente, sem
+certificado de ~90 dias pra renovar manualmente, e funciona de qualquer rede/dispositivo, não só na
+tailnet. **O esquema Tailscale/certificado local (`web/vite.config.ts` HTTPS opcional,
+`docker-compose.override.yml`, os arquivos `*.crt`/`*.key` na raiz) não foi removido nesta sessão** — seu
+uso real é pro fluxo de DEV (`npm run dev` fora de localhost, ex. celular na mesma rede), que continua
+precisando dele; só deixou de ser o caminho de acesso externo em produção. Fica marcado como candidato a
+descontinuação **depois** de confirmar em uso real que o acesso via `/yamabiko/` cobre as necessidades de
+teste em dispositivo físico (celular) que motivaram o Tailscale originalmente — decisão a revisitar, não
+tomada ainda porque descontinuar sem essa confirmação seria mudança de escopo (ver CLAUDE.md Sec. 0).
+
+### Por que same-origin via nginx compartilhado, e não um container/porta própria
+Web (browser) → HTTPS pública (Pangolin, já existente) → nginx do Ascend (container `web`, único ponto
+de entrada público que a VM expõe) → `/yamabiko/` serve estático, `/yamabiko-api/` proxya pro core-api.
+Alternativas descartadas: (a) pedir ao Pangolin pra rotear um host/porta novo — violava a restrição
+explícita do usuário de não pedir mudança de infra; (b) publicar uma porta nova no host (ex. `8002:80`
+com nginx próprio do yamabiko) — funcionaria tecnicamente mas o Pangolin não a exporia sem reconfiguração,
+então ficaria inacessível de fora da VM mesmo assim. Same-origin via nginx que já é o único ponto público
+é a única opção que não depende de nenhuma ação de terceiro.
+
+### O que foi implementado
+
+**1. Rede Docker externa compartilhada (`shared_net`) + volume externo (`yamabiko_web_dist`)**
+- `docker network create shared_net` e `docker volume create yamabiko_web_dist` — passo manual único,
+  documentado em `docker-compose.prod.yml` (comentário de uso no topo do arquivo), precisa rodar na VM
+  antes do primeiro `docker compose up` de qualquer um dos dois projetos.
+- `ascend/docker-compose.yml`: serviço `web` ganhou `networks: [default, shared_net]` (precisa listar
+  `default` explicitamente — adicionar `networks:` a um serviço desliga a entrada automática na rede
+  default do projeto, que o `web` continua precisando pra falar com `api`) e um volume read-only
+  `yamabiko_web_dist:/usr/share/nginx/html/yamabiko:ro`. Nenhum outro serviço do Ascend (`api`, `postgres`,
+  `redis`, `judge`) foi tocado — eles nem entram na rede compartilhada, nem no volume.
+- `yamabiko/docker-compose.prod.yml` (novo arquivo, produção — ver próxima seção): só `core-api` é
+  dual-homed (`default` + `shared_net`); é o único serviço yamabiko que o container `web` do Ascend precisa
+  alcançar. `postgres`, `stt-service`, `voicevox`, `piper` ficam só na rede interna do próprio projeto,
+  inacessíveis de fora — nem do host, nem do Ascend.
+
+**2. `yamabiko/docker-compose.prod.yml` (novo, produção — separado de `docker-compose.yml`, que continua
+sendo o de dev)**
+- Nenhum serviço publica porta no host (dev publica `8001`, `5433`, `9001`; produção não publica nada).
+- Segredos via `.env.prod` (não commitado, ver `.gitignore`) + `.env.prod.example` (template commitado) —
+  `JWT_SECRET`/`POSTGRES_PASSWORD` usam a sintaxe `${VAR:?mensagem}` do Compose, então `docker compose up`
+  falha explicitamente se alguém esquecer de configurar `.env.prod`, em vez de silenciosamente usar os
+  valores de dev (`dev-secret-troque-em-producao`, `yamabiko`/`yamabiko`).
+- `CORS_ALLOWED_ORIGINS=` vazio e `CORS_ALLOW_LOCAL_NETWORK=false` — same-origin de verdade via nginx,
+  diferente do dev (que precisa de CORS pro Vite dev server rodar numa porta separada).
+- Serviço `web-static` (novo, one-shot): builda o frontend (`web/Dockerfile.prod`, ver item 4) e publica
+  `dist/` no volume externo `yamabiko_web_dist`. Roda com `docker compose -f docker-compose.prod.yml run
+  --rm web-static` e sai — nunca fica de pé, nunca expõe porta. **Publicar uma nova versão do frontend
+  nunca exige rebuild/restart do container `web` do Ascend** — só rodar esse serviço de novo; nginx lê os
+  arquivos direto do volume a cada request.
+
+**3. `ascend/docker/nginx.conf` — dois blocos novos, nenhuma rota existente alterada**
+- `location /yamabiko-api/ { proxy_pass http://core-api:8080/; ... }` — a barra final em `proxy_pass`
+  remove o prefixo `/yamabiko-api/` antes de encaminhar (`/yamabiko-api/auth/login` vira
+  `core-api:8080/auth/login`, que é a rota real e sem prefixo do core-api). Mesmos headers de proxy que
+  `/api/` do Ascend já usa (`Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`).
+- `location /yamabiko/ { try_files $uri $uri/ /yamabiko/index.html; }` — herda o `root
+  /usr/share/nginx/html` do bloco `server` (não precisou de `alias`), resolvendo contra o volume montado
+  em `/usr/share/nginx/html/yamabiko`. SPA fallback local ao subpath, mesmo padrão do `location /` do
+  Ascend logo abaixo.
+- Confirmado que `location = /yamabiko` (sem barra final) não cai no fallback do Ascend por engano: o
+  `ngx_http_index_module` do nginx (via a diretiva `index index.html` do bloco `server`) detecta que o URI
+  resolve a um diretório de verdade e emite um redirect 301 pra `/yamabiko/` automaticamente, antes de
+  qualquer `location` ser re-avaliada — comportamento nativo do nginx, não precisou de bloco extra.
+
+**4. Build de produção do frontend (`web/vite.config.ts`, `web/src/main.tsx`, `web/src/lib/apiClient.ts`,
+`web/Dockerfile.prod` novo)**
+- `vite.config.ts`: `base: env.VITE_BASE_PATH || '/'` — sem a env var (dev, e2e), continua `/` de sempre.
+- `main.tsx`: `<BrowserRouter basename={import.meta.env.BASE_URL}>` — sem isso, navegação via
+  `<Link>`/`navigate()` do React Router ignoraria o prefixo `/yamabiko/` em produção.
+- `apiClient.ts`: `redirectToLogin()` trocou `window.location.assign("/login")` por
+  `` `${import.meta.env.BASE_URL}login` `` — `window.location`, ao contrário do React Router, não respeita
+  `basename` sozinho; único ponto do código que fazia navegação fora do React Router.
+- `VITE_API_BASE_URL` (já existia, usado por `apiClient.ts`) setado como build ARG `/yamabiko-api` — sem
+  precisar de nenhuma mudança de código nesse arquivo, o mecanismo já lia essa env var desde a sessão de
+  fix da LAN.
+- `web/Dockerfile.prod`: multi-stage, mas a imagem final NÃO serve nada (ao contrário do
+  `ascend/web/Dockerfile`, que termina em nginx) — só builda e é consumida pelo serviço `web-static` do
+  compose de produção, que copia `dist/` pro volume externo. Dev (`npm run dev`) e os testes e2e
+  (Playwright) nunca usam esse Dockerfile nem essas env vars — continuam servindo em `/` com API relativa
+  ao host, sem alteração de comportamento.
+
+### Bug pré-existente encontrado e corrigido (fora do escopo original, bloqueava o deploy)
+`ascend/web/package-lock.json`, commitado em `c262f6a` ("chore: update package-lock.json", 2026-07-28),
+estava corrompido — começava com texto solto de um comando de shell (`git restore --staged images.tar
+go1.26.0.linux-amd64.tar.gz`, `cat >> .gitignore << 'EOF'`, etc.) antes do JSON de verdade começar,
+provavelmente um heredoc que vazou pra esse arquivo numa sessão anterior. Isso quebrava `npm ci` (`EUSAGE:
+The npm ci command can only install with an existing package-lock.json`) — **a imagem de produção do
+`web` do Ascend estava impossível de buildar do zero desde esse commit**, mais de uma semana atrás,
+aparentemente sem ninguém notar porque o fluxo normal de dev usa `npm run dev`, não o Dockerfile de
+produção. Corrigido rodando `npm install --package-lock-only` dentro de `ascend/web` (não mudou
+`node_modules`, só regenerou o lockfile a partir do `package.json` existente e do que já estava
+instalado) — diff resultante é só a correção da corrupção, sem bump de versão de dependência. **Reportado
+aqui porque é risco real de produção do Ascend, independente do yamabiko**: qualquer rebuild futuro do
+`web` do Ascend a partir de um checkout limpo (CI, nova VM, `docker compose build --no-cache`) falharia
+até esse fix ser commitado.
+
+### Verificação — end-to-end local real, não só leitura de código (Docker Desktop, mesmos compose/nginx
+que rodariam na VM)
+**Sem acesso SSH à VM de produção nesta sessão** (`100.77.211.57`, IP encontrado em `~/.ssh/known_hosts`,
+`ssh` deu connection timeout na porta 22 a partir desta máquina) — a verificação real contra
+`https://cazemoises-webserver.learnops.duckdns.org/yamabiko/` fica pendente de alguém com acesso à VM
+rodar os comandos abaixo. Em vez de só ler o código, rodei a arquitetura completa localmente via Docker
+Desktop, com os MESMOS arquivos de compose/nginx que vão pra VM (`ascend/docker-compose.yml` +
+`ascend/docker/nginx.conf` + `yamabiko/docker-compose.prod.yml`), incluindo build real das imagens:
+
+1. `docker network create shared_net` + `docker volume create yamabiko_web_dist`.
+2. `docker compose -f yamabiko/docker-compose.prod.yml build` — core-api, stt-service, web-static, todos
+   buildam limpo.
+3. `docker compose -f ascend/docker-compose.yml build web` — rebuild do nginx com os 2 blocos novos (só
+   depois de corrigir o `package-lock.json`, ver acima).
+4. Subi `postgres core-api stt-service voicevox piper` do yamabiko (projeto Compose isolado
+   `yamabiko-prod-test`, pra não colidir com o volume de Postgres do `docker-compose.yml` de dev que já
+   existia nesta máquina) + `run --rm web-static` pra publicar o frontend no volume.
+5. `docker compose -f ascend/docker-compose.yml up -d` — só o container `web` precisou ser recriado
+   (`api`, `postgres`, `redis`, `judge` só reiniciaram sem mudança de config), confirmando que a mudança
+   ficou isolada.
+6. `curl` contra `http://localhost:8000` (a mesma porta que o Pangolin expõe publicamente):
+   - `GET /` → 200 (Ascend, raiz — **zero regressão**).
+   - `GET /healthz` → `{"status":"ok"}` (Ascend, **zero regressão**).
+   - `GET /api/v1/challenges` → 200 (Ascend, **zero regressão**).
+   - `GET /challenges` (rota client-side do Ascend, sem barra) → 200, SPA fallback do Ascend intacto.
+   - `GET /yamabiko/` → 200, HTML com `<script src="/yamabiko/assets/...">` (confirma `base` do Vite
+     aplicado corretamente no build).
+   - `GET /yamabiko/assets/index-*.js` → 200 (asset hasheado servido do volume).
+   - `GET /yamabiko/login` (rota client-side do yamabiko, sem arquivo físico) → 200, SPA fallback do
+     yamabiko funcionando isolado do fallback do Ascend.
+   - `GET /yamabiko` (sem barra final) → 301 → `/yamabiko/` (nginx `index` module, automático).
+   - `GET /yamabiko-api/health` → `{"status":"ok"}` (proxy chegando no core-api de verdade).
+   - `POST /yamabiko-api/auth/login` com credenciais inválidas → 401 (não 404 — confirma que o
+     `proxy_pass` com barra final está removendo o prefixo `/yamabiko-api/` corretamente antes de
+     encaminhar pro core-api).
+7. `docker ps` confirmou que nenhum container do yamabiko publicou porta nenhuma no host — só
+   `ascend-web-1:8000`, `ascend-api-1:9000`, `ascend-redis-1:6379`, `ascend-postgres-1:5432`, idênticos a
+   antes da mudança.
+8. Limpeza: parei os containers do Ascend (`docker compose stop`, restaura o estado "parado" de antes da
+   verificação) e removi por completo o projeto de teste `yamabiko-prod-test` (containers + volumes +
+   rede) — a rede `shared_net` e o volume `yamabiko_web_dist` ficaram (recriar na VM é passo normal do
+   primeiro deploy, ver comando 1 acima; localmente não atrapalham nada parados).
+
+### Passos que faltam pra ir ao ar de verdade (exigem acesso à VM, não feito nesta sessão)
+Na VM (ou por quem tiver acesso SSH a ela):
+```
+docker network create shared_net          # se ainda não existir
+docker volume create yamabiko_web_dist     # se ainda não existir
+cd yamabiko-platform && cp .env.prod.example .env.prod   # preencher JWT_SECRET/POSTGRES_PASSWORD reais
+docker compose -f docker-compose.prod.yml --env-file .env.prod build
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d postgres core-api stt-service voicevox piper
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm web-static
+cd ../ascend && docker compose build web && docker compose up -d
+curl https://cazemoises-webserver.learnops.duckdns.org/yamabiko-api/health
+curl https://cazemoises-webserver.learnops.duckdns.org/yamabiko/
+```
+Depois, confirmar em browser real (não só curl): cadastro/login funcionando via `/yamabiko-api/`, gravação
+de áudio funcionando (secure context via HTTPS pública do Pangolin, mesmo raciocínio do Tailscale
+original), e o Ascend continuando 100% funcional na raiz do mesmo domínio.
+
+### Débito técnico / decisões abertas desta sessão
+- `web-static` precisa ser rodado manualmente a cada deploy de frontend novo (`run --rm web-static`) —
+  não há CI/pipeline automatizado disparando isso; aceitável pro estágio atual do projeto (deploy manual
+  também é como o Ascend funciona hoje).
+- `shared_net`/`yamabiko_web_dist` são criados manualmente (`docker network create`/`docker volume
+  create`) fora dos arquivos de compose — Docker Compose não cria recursos `external: true`, só espera
+  que já existam. Documentado no topo de `docker-compose.prod.yml`.
+- TLS: o core-api de produção fala HTTP puro só dentro da rede Docker — não precisa (nem deve) dos
+  `TLS_CERT_FILE`/`TLS_KEY_FILE` do `docker-compose.override.yml` de dev, já que quem termina TLS é o
+  Pangolin. Confirmar isso continua verdade se o Pangolin/arquitetura de borda mudar no futuro.
 
 ## Última ação — HTTPS via Tailscale v2: causa raiz real do "continua servindo HTTP"
 
