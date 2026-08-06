@@ -5,6 +5,7 @@ import { SpeakButton } from "../../components/audio/SpeakButton";
 import { AudioExercise } from "./AudioExercise";
 import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
 import { WordOrderExercise } from "./WordOrderExercise";
+import { VerbConjugationExercise } from "./VerbConjugationExercise";
 import { TopBar } from "../../components/layout/TopBar";
 
 // Shell compartilhado por todo exercise_type (Frames 4-19): topbar,
@@ -129,6 +130,8 @@ function ExerciseBody({
       return <MultipleChoiceExercise exercise={exercise} onAnswered={onAnswered} />;
     case "word_order":
       return <WordOrderExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "verb_conjugation":
+      return <VerbConjugationExercise exercise={exercise} onAnswered={onAnswered} />;
     case "audio_pronunciation":
     case undefined:
       return (
