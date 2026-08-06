@@ -10,11 +10,12 @@ const NAV_ITEMS = [
   { to: "/settings/voice", label: "Voz", icon: VoiceIcon, end: false },
 ];
 
-// AppShell substitui a antiga <nav className="navbar"> — bottom nav em
-// mobile (chrome de app real, não a barra horizontal de link de texto do
-// design anterior). A versão desktop (sidebar fixa, breakpoint ~1024px)
-// entra numa mudança própria neste mesmo componente, commit separado
-// ("layout desktop"), pra não misturar as duas mudanças visuais.
+// AppShell substitui a antiga <nav className="navbar">: mesmo componente,
+// mesma lista de itens (NAV_ITEMS) e mesma lógica de navegação em mobile e
+// desktop — só a MARCAÇÃO do container muda (bottom nav vs. sidebar) e
+// isso é resolvido por CSS (breakpoint ~1024px em index.css), não por 2
+// implementações React separadas. Os dois containers ficam sempre no DOM;
+// display:none esconde o que não é da faixa de largura atual.
 export function AppShell({ children }: { children: ReactNode }) {
   const { isAuthenticated, logout } = useAuth();
 
@@ -24,7 +25,29 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
+      <nav className="sidebar-nav" aria-label="Navegação principal">
+        <span className="sidebar-brand">やまびこ</span>
+        <div className="sidebar-nav-items">
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => (isActive ? "sidebar-nav-item active" : "sidebar-nav-item")}
+            >
+              <Icon />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </div>
+        <button type="button" className="sidebar-nav-item sidebar-nav-exit" onClick={logout}>
+          <ExitIcon />
+          <span>Sair</span>
+        </button>
+      </nav>
+
       <div className="app-content">{children}</div>
+
       <nav className="bottom-nav" aria-label="Navegação principal">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -77,9 +100,9 @@ function ExercisesIcon() {
 function ProgressIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18">
-      <rect x="2" y="8" width="3" height="8" className="bottom-nav-icon-fill" stroke="none" />
-      <rect x="7.5" y="4" width="3" height="12" className="bottom-nav-icon-fill" stroke="none" />
-      <rect x="13" y="10" width="3" height="6" className="bottom-nav-icon-fill" stroke="none" />
+      <rect x="2" y="8" width="3" height="8" className="nav-icon-fill" stroke="none" />
+      <rect x="7.5" y="4" width="3" height="12" className="nav-icon-fill" stroke="none" />
+      <rect x="13" y="10" width="3" height="6" className="nav-icon-fill" stroke="none" />
     </svg>
   );
 }
