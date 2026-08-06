@@ -83,8 +83,8 @@ test("seletor de voz: mostra a preferência salva, toca preview, e salva nova se
   const naturalRow = page.locator(".voice-row", { hasText: "Voz Feminina Natural" });
 
   // A voz salva no perfil (preferred_voice_ja) já vem marcada como selecionada.
-  await expect(neutralRow.getByRole("button", { name: "✓ Selecionada" })).toBeVisible();
-  await expect(naturalRow.getByRole("button", { name: "Selecionar" })).toBeVisible();
+  await expect(neutralRow.getByRole("button", { name: "Voz selecionada" })).toBeVisible();
+  await expect(naturalRow.getByRole("button", { name: "Selecionar Voz Feminina Natural" })).toBeVisible();
 
   // Ouvir o preview de uma voz ainda não selecionada toca via <audio> real.
   await naturalRow.getByRole("button", { name: "▶ Ouvir" }).click();
@@ -95,13 +95,13 @@ test("seletor de voz: mostra a preferência salva, toca preview, e salva nova se
 
   // Selecionar a nova voz dispara o PATCH com language+voice_id corretos e
   // atualiza a marcação de "selecionada" sem precisar recarregar a página.
-  await naturalRow.getByRole("button", { name: "Selecionar" }).click();
+  await naturalRow.getByRole("button", { name: "Selecionar Voz Feminina Natural" }).click();
   await expect.poll(() => patchedBody).toEqual({ language: "ja-JP", voice_id: "ja-female-natural" });
-  await expect(naturalRow.getByRole("button", { name: "✓ Selecionada" })).toBeVisible();
-  await expect(neutralRow.getByRole("button", { name: "Selecionar" })).toBeVisible();
+  await expect(naturalRow.getByRole("button", { name: "Voz selecionada" })).toBeVisible();
+  await expect(neutralRow.getByRole("button", { name: "Selecionar Locutor(a) Neutro(a)" })).toBeVisible();
 
   // Trocar de idioma troca a lista pro catálogo en-US.
-  await page.getByRole("button", { name: "🇺🇸 Inglês" }).click();
+  await page.getByRole("button", { name: "Inglês" }).click();
   await expect(page.getByText("Lessac (voz masculina neutra)")).toBeVisible();
   await expect(page.getByText("LJSpeech (voz feminina)")).toBeVisible();
   await expect(page.getByText("Locutor(a) Neutro(a)")).not.toBeVisible();
