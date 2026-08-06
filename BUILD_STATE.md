@@ -4,12 +4,51 @@
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
 com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
 (FASE A) + import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via
-LAN em dev — **TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário
-o que priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos
-novos de exercício não persistem tentativa — decisão de escopo documentada abaixo, revisitável). Ver
-"Última ação" pro detalhe completo da FASE B (17 commits) e as decisões tomadas.
+LAN em dev, incluindo o fix da base URL da API que faltava pro acesso via LAN funcionar de fato —
+**TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que
+priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de
+exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última
+ação" pro fix mais recente (base URL da API) e a seção seguinte pro detalhe completo da FASE B.
 
-## Última ação — FASE B concluída: design importado, 8 exercise_type, desktop, tema/accent (17 commits)
+## Última ação — fix: base URL da API hardcoded em "localhost" quebrava acesso via LAN
+
+Pedido de follow-up do usuário: o acesso via LAN configurado numa sessão anterior (`vite host:true`,
+`CORS_ALLOW_LOCAL_NETWORK`) continuava não funcionando de verdade pelo celular — a causa era que o
+`web` ainda mandava toda chamada de API pra `http://localhost:9001` fixo, e "localhost" no dispositivo
+CLIENTE nunca aponta pro servidor (aponta pra ele mesmo).
+
+- **`web/src/lib/apiClient.ts`**: sem `VITE_API_BASE_URL` setado, o default deixou de ser o literal
+  `"http://localhost:9001"` e virou `` `${window.location.protocol}//${window.location.hostname}:9001` ``
+  — a porta do core-api é fixa (mapeada pelo `docker-compose`, a mesma em qualquer rede), só o host varia,
+  e o host que já carregou a própria página É o host certo pra falar com a API. Funciona sozinho pra
+  `localhost`, IP de LAN (`192.168.0.106`) ou Tailscale (`100.83.153.119`), sem configuração manual por
+  dispositivo — exatamente o pedido do usuário.
+- **Causa raiz real do bug, só achada testando de verdade via IP (não só lendo o código)**: um
+  `web/.env` local (não rastreado pelo git — criado numa sessão anterior, provavelmente quando o fallback
+  original foi escrito) setava `VITE_API_BASE_URL=http://localhost:9001` explicitamente. Por precedência
+  (`import.meta.env.VITE_API_BASE_URL ?? default`), isso ganhava do default dinâmico *independente* da
+  mudança de código — o primeiro teste via IP de rede confirmou 100% das chamadas ainda indo pra
+  `localhost:9001` mesmo com o código já corrigido. Removido o `.env` local; `web/.env.example`
+  (rastreado) atualizado documentando que a variável agora é **opcional**, com a linha comentada como
+  referência só pra quando o core-api estiver num host/porta fora do padrão de dev (ex: apontar pro
+  domínio real numa build de produção).
+- **Bug de teste achado no processo de re-rodar tudo**: `token-refresh.spec.ts` nunca mockava
+  `GET /users/me` (diferente dos 6 specs já corrigidos na sessão da FASE B — esse ficou de fora por engano,
+  eu tinha lembrado errado que ele já tinha mock próprio). O `AppearanceContext` chamando esse endpoint em
+  paralelo com `/exercises*` deixou de cair no mesmo `refreshInFlight` de forma consistente (timing),
+  duplicando `refreshCalls` — passava por sorte antes, começou a falhar de forma determinística (3/3).
+  Corrigido com o mesmo helper `mockProfile()`.
+
+**Verificação exigida explicitamente pelo usuário — acesso via IP de rede real, não só localhost**: reinício
+do Vite dev server (precisa recarregar o `.env` removido — mudança em arquivo `.env` não tem hot-reload),
+script Playwright descartável navegando literalmente por `http://192.168.0.106:5173/register` (o IP real
+da Wi-Fi desta máquina, `ipconfig` confirmou de novo) — cadastro completo + Home carregando cenários reais,
+com 36 chamadas de API capturadas e **0 delas foram pra "localhost"**, todas corretamente pra
+`192.168.0.106:9001`. Reconfirmado em seguida que `http://localhost:5173` continua indo pra
+`localhost:9001` normalmente (não quebrou o caso comum). `go build`/`go vet`/`go test ./...` e
+`tsc -b`/`oxlint`/`playwright test` (29/29) limpos.
+
+## Última ação (histórico — FASE B concluída: design importado, 8 exercise_type, desktop, tema/accent, 17 commits)
 
 Pedido do usuário (mesma mensagem da FASE A, "duas fases, nessa ordem, sem pausar entre elas"): importar o
 design `Yamabiko.dc.html` (claude.ai/design, projeto `c66cb199-1083-4b66-8d10-ec8fc60be837`, 19 frames
