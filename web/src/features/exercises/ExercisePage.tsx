@@ -4,6 +4,7 @@ import { getExercise, getScenario, type Exercise, type ScenarioDetail } from "./
 import { SpeakButton } from "../../components/audio/SpeakButton";
 import { AudioExercise } from "./AudioExercise";
 import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
+import { WordOrderExercise } from "./WordOrderExercise";
 import { TopBar } from "../../components/layout/TopBar";
 
 // Shell compartilhado por todo exercise_type (Frames 4-19): topbar,
@@ -126,6 +127,8 @@ function ExerciseBody({
   switch (exercise.exercise_type) {
     case "multiple_choice_translation":
       return <MultipleChoiceExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "word_order":
+      return <WordOrderExercise exercise={exercise} onAnswered={onAnswered} />;
     case "audio_pronunciation":
     case undefined:
       return (
