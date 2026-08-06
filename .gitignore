@@ -2,9 +2,32 @@ venv/
 __pycache__/
 *.pyc
 .env
+# .env.https (não ".env.*" — isso pegaria .env.example, que É rastreado de
+# propósito) guarda os caminhos TLS_CERT/TLS_KEY locais pro modo
+# `vite --mode https` (ver web/vite.config.ts e web/package.json,
+# script "dev:https"). Fica num arquivo .env separado (não o .env geral)
+# justamente pra NÃO afetar o `npm run dev` comum nem o webServer que o
+# Playwright sobe pros e2e — só ativa TLS quando o modo é pedido
+# explicitamente.
+web/.env.https
 *.wav
 *.mp3
 core-api/tmp/
 web/node_modules/
 web/dist/
 .DS_Store
+
+# Certificados TLS locais (ex: gerados via `tailscale cert`, ver
+# BUILD_STATE.md) — a chave privada nunca pode ir pro repositório; o
+# certificado público também fica de fora por simplicidade (é regenerado
+# localmente, não precisa estar versionado).
+*.key
+*.crt
+*.pem
+
+# Override local do docker-compose (monta o certificado TLS acima no
+# core-api) — específico desta máquina/rede Tailscale, não portável, nunca
+# comitado. docker compose lê docker-compose.yml + docker-compose.override.yml
+# automaticamente quando o 2º existe; sem ele, `docker compose up` usa só o
+# base (sem TLS), então um clone novo do repo nunca quebra por causa disso.
+docker-compose.override.yml

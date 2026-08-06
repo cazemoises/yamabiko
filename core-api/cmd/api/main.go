@@ -69,6 +69,19 @@ func main() {
 
 	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins, cfg.CORSAllowLocalNetwork)
 
+	if cfg.TLSEnabled() {
+		// HTTPS real (ex: certificado Tailscale, ver BUILD_STATE.md) —
+		// necessário porque uma página HTTPS não consegue chamar uma API
+		// http:// (mixed content, bloqueado pelo próprio browser antes de a
+		// requisição sair, confirmado ao vivo). Mesmo cert/key do `web`
+		// (Vite), só montados também no container do core-api.
+		log.Printf("core-api ouvindo HTTPS na porta %s (TLS_CERT_FILE=%s)", cfg.Port, cfg.TLSCertFile)
+		if err := http.ListenAndServeTLS(":"+cfg.Port, cfg.TLSCertFile, cfg.TLSKeyFile, router); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	log.Printf("core-api ouvindo na porta %s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatal(err)

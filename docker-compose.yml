@@ -81,7 +81,16 @@ services:
       - JWT_SECRET=dev-secret-troque-em-producao
       - PORT=8080
       - STT_SERVICE_URL=http://stt-service:8000
-      - CORS_ALLOWED_ORIGINS=http://localhost:5173
+      # https://caze.tailc68a7f.ts.net:5173 é o hostname MagicDNS do
+      # Tailscale desta máquina (Sec. pedida pelo usuário — acesso via HTTPS
+      # real, necessário pro getUserMedia funcionar no Safari iOS, ver
+      # BUILD_STATE.md). CORS_ALLOW_LOCAL_NETWORK (abaixo) NÃO cobre esse
+      # origin: ele só aceita http:// (não https://) com host IP de rede
+      # privada RFC1918 — o IP do Tailscale é CGNAT (100.64.0.0/10, RFC
+      # 6598), fora do que net.IP.IsPrivate() considera privado, e aqui é um
+      # hostname (MagicDNS), não IP literal, de qualquer forma. Por isso
+      # precisa entrar explicitamente na whitelist estática.
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,https://caze.tailc68a7f.ts.net:5173
       # Dev-only (Sec. pedida pelo usuário — testar o `web` pelo celular na
       # mesma Wi-Fi): aceita qualquer origin http://<IP-de-rede-privada>,
       # SEM precisar fixar o IP da máquina aqui (ele muda a cada rede/DHCP

@@ -19,6 +19,23 @@ type Config struct {
 	VoicevoxURL           string
 	PiperAddress          string
 	AudioCacheDir         string
+	// TLSCertFile/TLSKeyFile (env TLS_CERT_FILE/TLS_KEY_FILE) — opcional,
+	// sobe com HTTPS em vez de HTTP puro quando os 2 estão setados (ver
+	// cmd/api/main.go). Necessário pra acessar o `web` via HTTPS real (ex:
+	// Tailscale, ver BUILD_STATE.md) sem "mixed content": um fetch() de uma
+	// página HTTPS pra uma API http:// é bloqueado pelo próprio browser
+	// (confirmado ao vivo — Chrome recusa com "Mixed Content... This
+	// request has been blocked"), então servir só o `web` via HTTPS não
+	// basta, o core-api também precisa falar TLS no mesmo hostname.
+	TLSCertFile string
+	TLSKeyFile  string
+}
+
+// TLSEnabled é true só quando os 2 arquivos estão configurados — usar só um
+// dos dois é erro de configuração (ver main.go, que recusa a subir nesse
+// caso em vez de silenciosamente cair pra HTTP).
+func (c *Config) TLSEnabled() bool {
+	return c.TLSCertFile != "" && c.TLSKeyFile != ""
 }
 
 func Load() (*Config, error) {
@@ -61,6 +78,12 @@ func Load() (*Config, error) {
 		audioCacheDir = "audio-cache"
 	}
 
+	tlsCertFile := os.Getenv("TLS_CERT_FILE")
+	tlsKeyFile := os.Getenv("TLS_KEY_FILE")
+	if (tlsCertFile == "") != (tlsKeyFile == "") {
+		return nil, fmt.Errorf("TLS_CERT_FILE e TLS_KEY_FILE precisam estar os 2 setados ou os 2 vazios (veio cert=%q, key=%q)", tlsCertFile, tlsKeyFile)
+	}
+
 	return &Config{
 		Port:                  port,
 		DatabaseURL:           dbURL,
@@ -73,6 +96,8 @@ func Load() (*Config, error) {
 		VoicevoxURL:           voicevoxURL,
 		PiperAddress:          piperAddress,
 		AudioCacheDir:         audioCacheDir,
+		TLSCertFile:           tlsCertFile,
+		TLSKeyFile:            tlsKeyFile,
 	}, nil
 }
 
