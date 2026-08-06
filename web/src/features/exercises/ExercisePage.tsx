@@ -1,32 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getExercise, getScenario, submitAttempt, type AttemptResult, type Exercise, type ScenarioDetail } from "./api";
-import { AudioRecorder } from "../../components/audio/AudioRecorder";
+import { getExercise, getScenario, type Exercise, type ScenarioDetail } from "./api";
 import { SpeakButton } from "../../components/audio/SpeakButton";
-import { AudioResultView } from "./AudioResultView";
+import { AudioExercise } from "./AudioExercise";
+import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
 import { TopBar } from "../../components/layout/TopBar";
-import { ApiError } from "../../lib/apiClient";
 
-// Dispatcher por exercise_type (Frames 4/5 = audio_pronunciation, Frames
-// 9-19 = os 7 tipos novos da Fase A) — só audio_pronunciation está
-// implementado nesta tela por enquanto; os outros entram em commits
-// próprios seguintes, um tipo por vez.
+// Shell compartilhado por todo exercise_type (Frames 4-19): topbar,
+// contexto de cenário, e o rodapé de navegação (Próximo/Tentar de
+// novo/cenário concluído) — o que muda por tipo é só o miolo (pergunta +
+// resposta + feedback inline), delegado pro componente de cada tipo via
+// onAnswered(correct). "Tentar de novo" remonta o miolo inteiro
+// (key={resetKey}), limpando qualquer seleção/estado do tipo específico.
 export function ExercisePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [scenario, setScenario] = useState<ScenarioDetail | null>(null);
-  const [result, setResult] = useState<AttemptResult | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [attemptNumber, setAttemptNumber] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [answered, setAnswered] = useState<boolean | null>(null);
+  const [resetKey, setResetKey] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setResult(null);
-    setError(null);
-    setAttemptNumber(0);
+    setAnswered(null);
+    setResetKey(0);
     getExercise(id)
       .then(setExercise)
       .catch(() => setLoadError("Exercício não encontrado"));
@@ -44,24 +42,13 @@ export function ExercisePage() {
     getScenario(exercise.scenario_id).catch(() => null).then((s) => s && setScenario(s));
   }, [exercise?.scenario_id]);
 
-  async function handleRecorded(blob: Blob): Promise<void> {
-    if (!id) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const attemptResult = await submitAttempt(id, blob);
-      setResult(attemptResult);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erro ao enviar tentativa");
-    } finally {
-      setSubmitting(false);
-    }
+  function handleAnswered(correct: boolean): void {
+    setAnswered(correct);
   }
 
   function handleRetry(): void {
-    setResult(null);
-    setError(null);
-    setAttemptNumber((n) => n + 1);
+    setAnswered(null);
+    setResetKey((n) => n + 1);
   }
 
   if (loadError) return <p className="error center-message">{loadError}</p>;
@@ -71,22 +58,11 @@ export function ExercisePage() {
   const currentIndex = scenario ? scenarioExercises.findIndex((e) => e.id === exercise.id) : -1;
   const inScenario = scenario !== null && currentIndex >= 0;
   const nextExercise = inScenario ? scenarioExercises[currentIndex + 1] : undefined;
-  const passedInScenario = inScenario && result?.verdict === "PASS";
+  const passedInScenario = inScenario && answered === true;
 
   function handleNext(): void {
     if (!nextExercise) return;
     navigate(`/exercises/${nextExercise.id}`);
-  }
-
-  if (exercise.exercise_type && exercise.exercise_type !== "audio_pronunciation") {
-    return (
-      <div>
-        <TopBar backTo="/exercises" />
-        <p className="center-message">
-          Tipo de exercício "{exercise.exercise_type}" ainda não tem tela própria — chega em breve.
-        </p>
-      </div>
-    );
   }
 
   return (
@@ -96,58 +72,74 @@ export function ExercisePage() {
         backTo={inScenario ? undefined : "/exercises"}
       />
 
-      {inScenario && !result && (
+      {inScenario && answered === null && (
         <div className="context-banner">
           <span className="context-banner-body">{scenario.context_description_pt}</span>
         </div>
       )}
 
-      {!result && (
-        <>
-          <div className="exercise-prompt">
-            <span className="exercise-prompt-hint">{exercise.prompt_pt}</span>
-            <span className={exercise.language?.startsWith("ja") ? "jp exercise-prompt-main jp-lg" : "exercise-prompt-main"}>
-              {exercise.expected_transcript}
-            </span>
-            {exercise.expected_romaji && <span className="exercise-prompt-sub">{exercise.expected_romaji}</span>}
-          </div>
+      {/* key inclui exercise.id: sem isso, navegar pro próximo exercício do
+          cenário (mesmo resetKey=0) não remontaria ExerciseBody, e o estado
+          interno do tipo anterior (ex: AudioExercise.result) vazaria pro
+          exercício novo. */}
+      <ExerciseBody key={`${exercise.id}-${resetKey}`} exercise={exercise} resetKey={resetKey} onAnswered={handleAnswered} />
 
-          <div className="record-stage">
-            <SpeakButton exerciseId={exercise.id} />
-            <AudioRecorder key={attemptNumber} autoStart={attemptNumber > 0} onRecorded={handleRecorded} disabled={submitting} />
-          </div>
-        </>
-      )}
-
-      {submitting && <p className="center-message">Enviando e transcrevendo...</p>}
-      {error && <p className="error">{error}</p>}
-
-      {result && (
-        <>
-          <AudioResultView exercise={exercise} result={result} />
-          <div className="btn-block-group">
-            {passedInScenario ? (
-              nextExercise ? (
-                <button type="button" className="btn-primary" onClick={handleNext}>
-                  Próximo →
-                </button>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                  <p style={{ fontWeight: 700, color: "var(--text)" }}>🎉 Cenário concluído!</p>
-                  <Link to="/exercises" style={{ fontSize: 13 }}>
-                    Voltar aos exercícios
-                  </Link>
-                </div>
-              )
-            ) : (
-              <button type="button" className="btn-primary" onClick={handleRetry}>
-                Tentar de novo
+      {answered !== null && (
+        <div className="btn-block-group">
+          {passedInScenario ? (
+            nextExercise ? (
+              <button type="button" className="btn-primary" onClick={handleNext}>
+                Próximo →
               </button>
-            )}
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <p style={{ fontWeight: 700, color: "var(--text)" }}>🎉 Cenário concluído!</p>
+                <Link to="/exercises" style={{ fontSize: 13 }}>
+                  Voltar aos exercícios
+                </Link>
+              </div>
+            )
+          ) : !answered ? (
+            <button type="button" className="btn-primary" onClick={handleRetry}>
+              Tentar de novo
+            </button>
+          ) : null}
+
+          {exercise.exercise_type === "audio_pronunciation" && (
             <SpeakButton exerciseId={exercise.id} label="Ouvir pronúncia esperada" />
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   );
+}
+
+function ExerciseBody({
+  exercise,
+  resetKey,
+  onAnswered,
+}: {
+  exercise: Exercise;
+  resetKey: number;
+  onAnswered: (correct: boolean) => void;
+}) {
+  switch (exercise.exercise_type) {
+    case "multiple_choice_translation":
+      return <MultipleChoiceExercise exercise={exercise} onAnswered={onAnswered} />;
+    case "audio_pronunciation":
+    case undefined:
+      return (
+        <AudioExercise
+          exercise={exercise}
+          autoStart={resetKey > 0}
+          onAnswered={(correct) => onAnswered(correct)}
+        />
+      );
+    default:
+      return (
+        <p className="center-message">
+          Tipo de exercício "{exercise.exercise_type}" ainda não tem tela própria — chega em breve.
+        </p>
+      );
+  }
 }

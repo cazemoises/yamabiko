@@ -91,3 +91,76 @@ export function submitAttempt(exerciseId: string, audioBlob: Blob): Promise<Atte
 export function getAttemptHistory(exerciseId: string): Promise<Attempt[]> {
   return api.get<Attempt[]>(`/exercises/${exerciseId}/attempts`);
 }
+
+// ---------- Fase A: os 5 tipos binários (POST /answer) ----------
+
+export interface MatchingPair {
+  left: string;
+  right: string;
+}
+
+// Só os campos relevantes ao exercise_type do exercício vão preenchidos —
+// espelha validation.AnswerRequest em core-api/internal/exercises/validation.
+export interface AnswerRequest {
+  selected_index?: number;
+  submitted_order?: string[];
+  submitted_pairs?: MatchingPair[];
+  answer?: boolean;
+}
+
+export interface AnswerResult {
+  correct: boolean;
+  correct_index?: number;
+  correct_order?: string[];
+  correct_pairs?: MatchingPair[];
+  correct_answer?: boolean;
+}
+
+export function submitAnswer(exerciseId: string, req: AnswerRequest): Promise<AnswerResult> {
+  return api.post<AnswerResult>(`/exercises/${exerciseId}/answer`, req);
+}
+
+// ---------- Fase A: dictation e free_translation (POST /text-attempt) ----------
+
+export interface TextAttemptResult {
+  transcript: string;
+  score: number;
+  verdict: Verdict;
+  diff: DiffEntry[];
+}
+
+export function submitTextAttempt(exerciseId: string, transcript: string): Promise<TextAttemptResult> {
+  return api.post<TextAttemptResult>(`/exercises/${exerciseId}/text-attempt`, { transcript });
+}
+
+// ---------- type_data por exercise_type (espelha core-api/internal/exercises/validation) ----------
+
+export interface MultipleChoiceTranslationData {
+  options: string[];
+  correct_index: number;
+}
+
+export interface WordOrderData {
+  shuffled_words: string[];
+  correct_order: string[];
+}
+
+export interface VerbConjugationData {
+  sentence_template: string;
+  verb_infinitive: string;
+  options: string[];
+  correct_index: number;
+}
+
+export interface FreeTranslationData {
+  acceptable_answers: string[];
+}
+
+export interface MatchingPairsData {
+  pairs: MatchingPair[];
+}
+
+export interface TrueFalseData {
+  statement: string;
+  correct_answer: boolean;
+}
