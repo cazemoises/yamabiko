@@ -6,6 +6,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  pinLogin: (userId: string, pin: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,13 +27,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthenticated(true);
   }
 
+  async function pinLogin(userId: string, pin: string): Promise<void> {
+    const tokens = await api.post<TokenPair>("/auth/pin-login", { user_id: userId, pin });
+    saveTokens(tokens);
+    setAuthenticated(true);
+  }
+
   function logout(): void {
     clearTokens();
     setAuthenticated(false);
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: authenticated, login, register, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated: authenticated, login, register, pinLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

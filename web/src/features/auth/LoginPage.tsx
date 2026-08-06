@@ -45,6 +45,9 @@ export function LoginPage() {
       <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
         Não tem conta? <Link to="/register">Cadastre-se</Link>
       </p>
+      <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+        <Link to="/login">← Voltar pra seleção de perfil</Link>
+      </p>
     </div>
   );
 }

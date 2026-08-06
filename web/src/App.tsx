@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { AppearanceProvider } from "./features/users/AppearanceContext";
 import { LoginPage } from "./features/auth/LoginPage";
+import { ProfileSelectPage } from "./features/auth/ProfileSelectPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { HomePage } from "./features/home/HomePage";
 import { ExercisesListPage } from "./features/exercises/ExercisesListPage";
@@ -23,7 +24,8 @@ function AppRoutes() {
   return (
     <AppShell>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<ProfileSelectPage />} />
+        <Route path="/login/password" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/"

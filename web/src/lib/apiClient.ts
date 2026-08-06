@@ -23,10 +23,15 @@ const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? defaultApiBase
 
 export class ApiError extends Error {
   status: number;
+  // Corpo bruto do erro (menos a chave "error", já usada como message) —
+  // pin-login devolve campos extras (attempts_remaining, retry_after_seconds)
+  // que a tela de PIN precisa pra UX de lockout/tentativas restantes.
+  body?: Record<string, unknown>;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -95,7 +100,7 @@ async function requestRaw(path: string, options: RequestInit = {}, isRetry = fal
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as { error?: string });
-    throw new ApiError(response.status, body.error ?? `Erro ${response.status}`);
+    throw new ApiError(response.status, body.error ?? `Erro ${response.status}`, body);
   }
   return response;
 }
