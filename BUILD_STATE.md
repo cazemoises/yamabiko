@@ -8,9 +8,58 @@ LAN em dev (fix da base URL da API + HTTPS real via Tailscale, necessário pro m
 localhost) — **TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário
 o que priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos
 novos de exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver
-"Última ação" pro HTTPS/Tailscale (mais recente) e as seções seguintes pro histórico completo.
+"Última ação" pro fix do HTTPS/Tailscale v2 (mais recente) e as seções seguintes pro histórico completo.
 
-## Última ação — HTTPS real via Tailscale (getUserMedia exige secure context)
+## Última ação — HTTPS via Tailscale v2: causa raiz real do "continua servindo HTTP"
+
+A v1 (seção histórica abaixo) documentou HTTPS como resolvido, mas só funcionava rodando `npm run
+dev:https` — um script dedicado que carregava `web/.env.https` via `vite --mode https`. O usuário reiniciou
+o Vite com o fluxo normal (`npm run dev`) e viu `http://localhost:5173` no terminal, achando (corretamente)
+que o HTTPS "não estava ativado de fato".
+
+**Causa raiz real**: não era o bug hipotetizado (`import.meta.env` dentro de `vite.config.ts` — o código já
+usava `loadEnv()` corretamente, confirmado lendo o arquivo antes de mexer). O problema era de design: a v1
+isolou as variáveis `VITE_TLS_CERT`/`VITE_TLS_KEY` num arquivo `.env.https` carregado só sob um `mode`
+("https") não-padrão, especificamente pra não vazar pro dev server que o Playwright sobe (`npm run dev`
+puro) — mas isso significa que **o fluxo comum de dev (`npm run dev`) nunca ativa HTTPS**, mesmo com
+certificado presente. Funcionava exatamente como programado; só não era o que o usuário esperava/queria
+(precisava lembrar de rodar um script diferente do de sempre).
+
+**Fix**: unificar em `web/.env` (arquivo padrão, carregado por `loadEnv()` em QUALQUER mode — inclusive o
+default usado por `npm run dev`) em vez de `.env.https`. Isso ativa HTTPS automaticamente sempre que o
+certificado existir, sem script/mode especial — mas reabre o problema original que a v1 evitou: o
+`webServer` do Playwright também roda via `npm run dev`, então herdaria HTTPS e quebraria a suite (mesmo
+erro de antes: `Timed out waiting ... from config.webServer`, Playwright esperando `http://localhost:5173`).
+Resolvido isolando o Playwright, não o dev geral: `web/playwright.config.ts` agora passa
+`webServer.env: { VITE_TLS_CERT: "", VITE_TLS_KEY: "" }`, que sobrescreve (com string vazia) o que
+`web/.env` define **só nesse processo filho específico** — confirmado empiricamente que `loadEnv()` do
+Vite dá precedência a `process.env` já setado sobre o valor lido do arquivo `.env`. `dev:https` (script e
+`.env.https`) foram removidos por ficarem redundantes.
+
+**Fix do silêncio (pedido explícito do usuário, causa da v1 parecer resolvida sem estar)**: `vite.config.ts`
+agora loga um dos 3 desfechos sempre, no terminal, sem exceção:
+- `[vite] HTTPS não ativado: VITE_TLS_CERT/VITE_TLS_KEY não definidos em web/.env — servindo HTTP.`
+- `[vite] HTTPS não ativado: certificado não encontrado (cert: <caminho> existe=false, ...) — servindo HTTP.`
+- `[vite] HTTPS ativado com certificado <caminho>`
+
+**Verificação real, não só leitura de código** (pedido explícito): matei qualquer processo antigo na porta
+5173 (`netstat` mostrou um Vite de sessão anterior ainda escutando), rodei `npm run dev -- --host` do zero
+e confirmei no terminal:
+```
+[vite] HTTPS ativado com certificado C:\Users\dev\Documents\projects\yamabiko\caze.tailc68a7f.ts.net.crt
+  Local:   https://localhost:5173/
+  Local:   https://caze.tailc68a7f.ts.net:5173/
+  Network: https://100.83.153.119:5173/  Tailscale
+  Network: https://192.168.0.106:5173/   Wi-Fi
+```
+Testei também os 2 casos de fallback (renomeando `.env` temporariamente / apontando pra caminho
+inexistente) — os 2 avisos aparecem como esperado e o servidor sobe em HTTP. Rodei a suite e2e completa
+(`playwright test`) depois de tudo isso com `web/.env` configurado com o certificado real — **29/29
+passaram**, confirmando que o override do `webServer.env` mantém o Playwright em HTTP mesmo com HTTPS
+ativo pro dev normal. `tsc -b` e `oxlint` limpos (só warnings pré-existentes de fast-refresh, não
+relacionados).
+
+## Última ação (histórico — HTTPS real via Tailscale v1, incompleta: só ativava via `npm run dev:https`)
 
 Pedido do usuário: servir o `web` via HTTPS com certificado real (já gerado via `tailscale cert`), porque
 `getUserMedia` (microfone, usado por `AudioRecorder`) exige "secure context" — HTTP puro só é tratado como
@@ -37,16 +86,13 @@ mesmo caminho apontado por `web/.env.https` (`VITE_TLS_CERT`/`VITE_TLS_KEY`) e
   (a forma certa de ler `.env` dentro de `vite.config.ts`, que roda em Node, não no browser — `import.meta.env`
   não existe nesse contexto). Sem as 2 variáveis (ou se os arquivos apontados não existirem — checado via
   `fs.existsSync`, com aviso no console em vez de crash), cai pro HTTP normal.
-- **`web/.env.https`** (não comitado, `.gitignore`): `VITE_TLS_CERT=<caminho absoluto do .crt>` +
-  `VITE_TLS_KEY=<caminho absoluto do .key>`. **Não fica no `web/.env` geral de propósito** — esse arquivo é
-  carregado em QUALQUER invocação de `vite` (inclusive o dev server que o Playwright sobe sozinho pros
-  e2e via `webServer.command` do `playwright.config.ts`), e habilitar HTTPS ali quebraria o
-  `baseURL: "http://localhost:5173"` que os testes esperam (achado ao vivo: `Timed out waiting ... from
-  config.webServer` — o Vite subia HTTPS, o Playwright checava HTTP, nunca batia). Isolado num arquivo por
-  MODE (`.env.https`, só carregado quando `vite --mode https` roda) resolve isso de vez — `npm run dev`
-  comum e o webServer dos e2e nunca veem essas variáveis.
-- **`web/package.json`**: novo script `"dev:https": "vite --mode https"` — é assim que se liga o HTTPS
-  localmente (`npm run dev:https`, não `npm run dev`).
+- **`web/.env.https`** (histórico, v1 — **removido na v2**, ver seção acima): tentativa de isolar
+  `VITE_TLS_CERT`/`VITE_TLS_KEY` por MODE não-padrão pra não vazar pro webServer do Playwright. Funcionava,
+  mas também significava que `npm run dev` comum nunca ativava HTTPS — não era o que o usuário queria. Na
+  v2 essas variáveis moraram pra `web/.env` normal, e o isolamento do Playwright passou a ser feito no
+  próprio `playwright.config.ts` (`webServer.env`), não no arquivo de env do Vite.
+- **`web/package.json`**: script `"dev:https"` (histórico, v1) — **removido na v2**, redundante já que
+  `npm run dev` passou a ativar HTTPS sozinho quando `web/.env` tem o certificado.
 - **`core-api`**: `TLS_CERT_FILE`/`TLS_KEY_FILE` (env vars, mesmo padrão opt-in — `cmd/api/main.go` chama
   `http.ListenAndServeTLS` só quando os 2 estão setados, `config.Load()` recusa subir se só um dos dois
   vier setado). **Achado testando de verdade, não só lendo o código**: servir só o `web` via HTTPS não
