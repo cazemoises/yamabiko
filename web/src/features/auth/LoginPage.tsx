@@ -17,7 +17,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/exercises");
+      navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao entrar");
     } finally {
@@ -38,11 +38,11 @@ export function LoginPage() {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
+        <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>
-      <p>
+      <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
         Não tem conta? <Link to="/register">Cadastre-se</Link>
       </p>
     </div>

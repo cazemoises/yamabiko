@@ -40,7 +40,7 @@ test("toggle JA/EN filtra a lista por idioma e reflete no botão de pronúncia e
   await expect(page.getByText(JA_EXERCISE.prompt_pt)).toBeVisible();
   await expect(page.getByText(EN_EXERCISE.prompt_pt)).not.toBeVisible();
 
-  await page.getByRole("button", { name: /Inglês/ }).click();
+  await page.getByRole("button", { name: "EN" }).click();
 
   await expect(page.getByText(EN_EXERCISE.prompt_pt)).toBeVisible();
   await expect(page.getByText(JA_EXERCISE.prompt_pt)).not.toBeVisible();

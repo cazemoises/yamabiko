@@ -18,7 +18,7 @@ export function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password, name);
-      navigate("/exercises");
+      navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro ao cadastrar");
     } finally {
@@ -49,11 +49,11 @@ export function RegisterPage() {
           />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading}>
+        <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? "Cadastrando..." : "Cadastrar"}
         </button>
       </form>
-      <p>
+      <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
         Já tem conta? <Link to="/login">Entrar</Link>
       </p>
     </div>

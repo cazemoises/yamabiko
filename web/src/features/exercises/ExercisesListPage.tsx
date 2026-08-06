@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { LanguageToggle } from "../../components/layout/LanguageToggle";
 import { listExercises, type Exercise } from "./api";
 
-const LANGUAGES = [
-  { value: "ja-JP", label: "🇯🇵 Japonês" },
-  { value: "en-US", label: "🇺🇸 Inglês" },
-];
-
+// Frame 6 do design ("Exercícios avulsos") — só as frases fora de um
+// cenário (scenario_id nulo). O backend não tem um filtro "sem cenário"
+// pronto (Filter.ScenarioID só filtra POR um cenário específico), então o
+// corte é client-side sobre a lista já carregada — mesmo custo de rede de
+// antes, só muda o que aparece na tela.
 export function ExercisesListPage() {
   const [language, setLanguage] = useState("ja-JP");
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -21,49 +22,37 @@ export function ExercisesListPage() {
       .finally(() => setLoading(false));
   }, [language]);
 
-  const bySprintDay = groupBySprintDay(exercises);
+  const standalone = exercises.filter((exercise) => !exercise.scenario_id);
 
   return (
-    <div className="exercises-list">
-      <h1>Exercícios</h1>
-      <div className="language-toggle" role="group" aria-label="Idioma dos exercícios">
-        {LANGUAGES.map((lang) => (
-          <button
-            key={lang.value}
-            type="button"
-            className={lang.value === language ? "language-toggle-button active" : "language-toggle-button"}
-            aria-pressed={lang.value === language}
-            onClick={() => setLanguage(lang.value)}
-          >
-            {lang.label}
-          </button>
-        ))}
+    <div className="page">
+      <div className="page-header">
+        <span className="page-title">Exercícios</span>
+        <LanguageToggle language={language} onChange={setLanguage} />
       </div>
-      {loading && <p>Carregando...</p>}
+      <p className="page-subtitle">Frases avulsas, fora de um cenário</p>
+
+      {loading && <p className="center-message">Carregando...</p>}
       {error && <p className="error">{error}</p>}
-      {!loading && !error && exercises.length === 0 && <p>Nenhum exercício encontrado nesse idioma.</p>}
-      {Object.entries(bySprintDay).map(([day, items]) => (
-        <section key={day}>
-          <h2>Dia {day}</h2>
-          <ul>
-            {items.map((exercise) => (
-              <li key={exercise.id}>
-                <Link to={`/exercises/${exercise.id}`}>
-                  <span className="category">{exercise.category}</span> {exercise.prompt_pt}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {!loading && !error && standalone.length === 0 && (
+        <p className="center-message">Nenhum exercício avulso nesse idioma.</p>
+      )}
+
+      <ul className="plain-list">
+        {standalone.map((exercise) => (
+          <li key={exercise.id}>
+            <Link to={`/exercises/${exercise.id}`} className="plain-list-row">
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span className={exercise.language?.startsWith("ja") ? "jp" : undefined} style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+                  {exercise.expected_transcript || exercise.prompt_pt}
+                </span>
+                <span className="list-row-subtitle">{exercise.prompt_pt}</span>
+              </div>
+              <span className="chip-dot" style={{ background: "var(--accent-base)" }} />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
-}
-
-function groupBySprintDay(exercises: Exercise[]): Record<number, Exercise[]> {
-  const result: Record<number, Exercise[]> = {};
-  for (const exercise of exercises) {
-    (result[exercise.sprint_day_ref] ??= []).push(exercise);
-  }
-  return result;
 }

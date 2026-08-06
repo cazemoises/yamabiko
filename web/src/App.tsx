@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
+import { HomePage } from "./features/home/HomePage";
 import { ExercisesListPage } from "./features/exercises/ExercisesListPage";
 import { ExercisePage } from "./features/exercises/ExercisePage";
+import { ScenariosListPage } from "./features/scenarios/ScenariosListPage";
+import { ScenarioPage } from "./features/scenarios/ScenarioPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { VoiceSettingsPage } from "./features/settings/VoiceSettingsPage";
 
@@ -14,66 +18,71 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function NavBar() {
-  const { isAuthenticated, logout } = useAuth();
-  if (!isAuthenticated) return null;
-  return (
-    <nav className="navbar">
-      <span className="brand">やまびこ</span>
-      <Link to="/exercises">Exercícios</Link>
-      <Link to="/dashboard">Progresso</Link>
-      <Link to="/settings/voice">Voz</Link>
-      <button type="button" onClick={logout}>
-        Sair
-      </button>
-    </nav>
-  );
-}
-
 function AppRoutes() {
   return (
-    <>
-      <NavBar />
-      <main>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="/exercises"
-            element={
-              <ProtectedRoute>
-                <ExercisesListPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/exercises/:id"
-            element={
-              <ProtectedRoute>
-                <ExercisePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings/voice"
-            element={
-              <ProtectedRoute>
-                <VoiceSettingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/exercises" replace />} />
-        </Routes>
-      </main>
-    </>
+    <AppShell>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/scenarios"
+          element={
+            <ProtectedRoute>
+              <ScenariosListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/scenarios/:id"
+          element={
+            <ProtectedRoute>
+              <ScenarioPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/exercises"
+          element={
+            <ProtectedRoute>
+              <ExercisesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/exercises/:id"
+          element={
+            <ProtectedRoute>
+              <ExercisePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/voice"
+          element={
+            <ProtectedRoute>
+              <VoiceSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppShell>
   );
 }
 
