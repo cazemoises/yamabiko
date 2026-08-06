@@ -4,13 +4,87 @@
 Trabalho pós-MVP: suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz
 com preview + catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício
 (FASE A) + import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via
-LAN em dev, incluindo o fix da base URL da API que faltava pro acesso via LAN funcionar de fato —
-**TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que
-priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de
-exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última
-ação" pro fix mais recente (base URL da API) e a seção seguinte pro detalhe completo da FASE B.
+LAN em dev (fix da base URL da API + HTTPS real via Tailscale, necessário pro microfone funcionar fora de
+localhost) — **TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário
+o que priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos
+novos de exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver
+"Última ação" pro HTTPS/Tailscale (mais recente) e as seções seguintes pro histórico completo.
 
-## Última ação — fix: base URL da API hardcoded em "localhost" quebrava acesso via LAN
+## Última ação — HTTPS real via Tailscale (getUserMedia exige secure context)
+
+Pedido do usuário: servir o `web` via HTTPS com certificado real (já gerado via `tailscale cert`), porque
+`getUserMedia` (microfone, usado por `AudioRecorder`) exige "secure context" — HTTP puro só é tratado como
+seguro em `localhost`, e no acesso via IP/hostname de rede (LAN, Tailscale) isso falha. Chrome Android tem
+um bypass pra IP de rede privada em HTTP puro, mas **Safari iOS não tem** — por isso HTTPS de verdade
+(não autoassinado, senão o Safari mostra aviso de certificado inválido) era necessário pra testar do
+celular via Tailscale.
+
+### Como gerar/regenerar o certificado (documentado aqui e como comentário no código)
+```
+tailscale cert caze.tailc68a7f.ts.net
+```
+Requer "HTTPS Certificates" habilitado no admin console do Tailscale (já confirmado ativo pro tailnet
+desta sessão). Gera `caze.tailc68a7f.ts.net.crt` (certificado) e `caze.tailc68a7f.ts.net.key` (chave
+privada) no diretório onde o comando roda — nesta sessão, na raiz do repo. **O certificado é Let's
+Encrypt, validade de ~90 dias** — precisa rodar o comando de novo periodicamente (o Tailscale renova
+automaticamente se `tailscale cert` for re-executado antes de expirar; não há automação disso configurada
+nesta sessão, é manual). Depois de gerar/regenerar, os arquivos `.crt`/`.key` só precisam continuar no
+mesmo caminho apontado por `web/.env.https` (`VITE_TLS_CERT`/`VITE_TLS_KEY`) e
+`docker-compose.override.yml` (monta os mesmos arquivos no core-api) — nenhum outro passo manual.
+
+### Onde cada peça mora (nenhum caminho de certificado hardcoded no código versionado)
+- **`web/vite.config.ts`**: `server.https` opcional — lê `VITE_TLS_CERT`/`VITE_TLS_KEY` via `loadEnv()`
+  (a forma certa de ler `.env` dentro de `vite.config.ts`, que roda em Node, não no browser — `import.meta.env`
+  não existe nesse contexto). Sem as 2 variáveis (ou se os arquivos apontados não existirem — checado via
+  `fs.existsSync`, com aviso no console em vez de crash), cai pro HTTP normal.
+- **`web/.env.https`** (não comitado, `.gitignore`): `VITE_TLS_CERT=<caminho absoluto do .crt>` +
+  `VITE_TLS_KEY=<caminho absoluto do .key>`. **Não fica no `web/.env` geral de propósito** — esse arquivo é
+  carregado em QUALQUER invocação de `vite` (inclusive o dev server que o Playwright sobe sozinho pros
+  e2e via `webServer.command` do `playwright.config.ts`), e habilitar HTTPS ali quebraria o
+  `baseURL: "http://localhost:5173"` que os testes esperam (achado ao vivo: `Timed out waiting ... from
+  config.webServer` — o Vite subia HTTPS, o Playwright checava HTTP, nunca batia). Isolado num arquivo por
+  MODE (`.env.https`, só carregado quando `vite --mode https` roda) resolve isso de vez — `npm run dev`
+  comum e o webServer dos e2e nunca veem essas variáveis.
+- **`web/package.json`**: novo script `"dev:https": "vite --mode https"` — é assim que se liga o HTTPS
+  localmente (`npm run dev:https`, não `npm run dev`).
+- **`core-api`**: `TLS_CERT_FILE`/`TLS_KEY_FILE` (env vars, mesmo padrão opt-in — `cmd/api/main.go` chama
+  `http.ListenAndServeTLS` só quando os 2 estão setados, `config.Load()` recusa subir se só um dos dois
+  vier setado). **Achado testando de verdade, não só lendo o código**: servir só o `web` via HTTPS não
+  bastava — uma página `https://` chamando `POST /auth/register` numa API `http://` é bloqueado pelo
+  próprio browser como "mixed content" (confirmado ao vivo no console: `Mixed Content: ... This request
+  has been blocked`), então o core-api também precisa falar TLS no mesmo hostname.
+- **`docker-compose.override.yml`** (não comitado, `.gitignore`): monta os mesmos 2 arquivos de
+  certificado no container do core-api (`/certs/cert.pem`, `/certs/key.pem`) e seta
+  `TLS_CERT_FILE`/`TLS_KEY_FILE` apontando pra lá. Docker Compose funde `docker-compose.yml` +
+  `docker-compose.override.yml` automaticamente quando o 2º existe — sem ele (ex: clone novo do repo
+  numa máquina sem o certificado), `docker compose up` usa só o base (HTTP puro), nunca quebra por causa
+  disso.
+- **`docker-compose.yml`** (comitado): `CORS_ALLOWED_ORIGINS` ganhou
+  `https://caze.tailc68a7f.ts.net:5173` explicitamente. O `CORS_ALLOW_LOCAL_NETWORK` de uma sessão
+  anterior **não cobre esse origin**: só aceita `http://` (não `https://`), e o IP do Tailscale é CGNAT
+  (`100.64.0.0/10`, RFC 6598) — fora do que `net.IP.IsPrivate()` (RFC1918) considera rede privada — além
+  de MagicDNS ser um hostname, não IP literal. Por isso precisa entrar na whitelist estática.
+
+### Verificação — explicitamente via IP/hostname de rede, não localhost (pedido do usuário)
+Script Playwright descartável (não commitado) acessando literalmente `https://caze.tailc68a7f.ts.net:5173`
+(com `web` subido via `npm run dev:https` e `core-api` via `docker compose up -d --build core-api` com o
+override aplicado):
+- `window.isSecureContext === true`.
+- `navigator.mediaDevices.getUserMedia({audio:true})` chamado direto devolveu um `MediaStream` de verdade
+  (1 audio track), sem erro de permissão/contexto inseguro.
+- Fluxo completo pela UI: cadastro → redirect pra Home → abrir exercício de áudio → clicar "Gravar" (
+  medidor de volume aparece, confirma stream de áudio fluindo de verdade) → "Parar gravação" → "Enviar" →
+  resultado real (`POST /exercises/{id}/attempts`, que passou pelo core-api via HTTPS) apareceu na tela.
+  Tudo isso com **zero erros de console relevantes** (WebSocket do HMR do Vite falha nesse hostname —
+  cosmético, não impede nada, não investigado a fundo por não bloquear o pedido).
+- Confirmado que `http://localhost:5173` (fluxo comum de dev) e o dev server que os e2e sobem continuam
+  funcionando sem nenhuma mudança de comportamento.
+
+`go build`/`go vet`/`go test ./...` e `tsc -b`/`oxlint`/`playwright test` (29/29) limpos. `curl` confirmou
+`ssl_verify_result: 0` (cadeia de certificado válida, não autoassinada) tanto pro `web:5173` quanto pro
+`core-api:9001` via `https://caze.tailc68a7f.ts.net`.
+
+## Última ação (histórico — fix: base URL da API hardcoded em "localhost" quebrava acesso via LAN)
 
 Pedido de follow-up do usuário: o acesso via LAN configurado numa sessão anterior (`vite host:true`,
 `CORS_ALLOW_LOCAL_NETWORK`) continuava não funcionando de verdade pelo celular — a causa era que o
