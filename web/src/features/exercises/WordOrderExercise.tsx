@@ -63,17 +63,21 @@ export function WordOrderExercise({ exercise, onAnswered }: WordOrderExercisePro
       </p>
 
       <div className="word-order-answer">
-        {placed.map((index, position) => (
-          <button
-            key={`${index}-${position}`}
-            type="button"
-            className="word-chip word-chip-placed"
-            disabled={result != null || submitting}
-            onClick={() => unplaceWord(position)}
-          >
-            {data.shuffled_words[index]}
-          </button>
-        ))}
+        {placed.map((index, position) => {
+          const classes = ["word-chip", "word-chip-placed"];
+          if (result) classes.push(result.correct ? "word-chip-correct" : "word-chip-incorrect");
+          return (
+            <button
+              key={`${index}-${position}`}
+              type="button"
+              className={classes.join(" ")}
+              disabled={result != null || submitting}
+              onClick={() => unplaceWord(position)}
+            >
+              {data.shuffled_words[index]}
+            </button>
+          );
+        })}
       </div>
 
       {result && !result.correct && result.correct_order && (

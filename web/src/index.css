@@ -645,6 +645,16 @@ textarea {
   color: var(--accent-on);
 }
 
+.word-chip-correct {
+  background: var(--pass);
+  color: var(--accent-on);
+}
+
+.word-chip-incorrect {
+  background: var(--fail);
+  color: var(--accent-on);
+}
+
 .word-chip-bank {
   border: 1px solid var(--border);
   background: var(--bg-card);
