@@ -1,27 +1,21 @@
-# Produção — reaproveita a VM onde o Ascend já roda (mesma rede Docker
-# externa `shared_net`, ver ../ascend/docker-compose.yml e BUILD_STATE.md
-# pra decisão de arquitetura completa). Diferenças deliberadas em relação a
-# docker-compose.yml (dev):
-#   - Nenhum serviço publica porta no host (evita conflito com o postgres do
-#     Ascend em 5432 e o redis em 6379, e não precisa de nenhuma mudança de
-#     infra pedida ao responsável pela VM/Pangolin — tudo alcançável só via
-#     rede Docker interna).
+# Produção — VM compartilhada via Caddy (rede externa `shared-services`,
+# ver infra-proxy/Caddyfile e docker network ls na VM). Diferenças
+# deliberadas em relação a docker-compose.yml (dev):
+#   - Nenhum serviço interno (postgres/stt-service/voicevox/piper) publica
+#     porta no host — só alcançável via rede Docker interna do projeto.
+#   - `core-api` e `web` são as únicas portas de entrada externas: ambos
+#     entram na rede externa `shared-services` pra o Caddy alcançá-los por
+#     nome de container.
 #   - Sem os volumes de certificado TLS (docker-compose.override.yml, só
-#     dev/Tailscale) — em produção o TLS é terminado pelo Pangolin, o
-#     core-api fala HTTP puro só dentro da rede Docker.
-#   - Segredos vêm de `.env.prod` (não commitado, ver .env.prod.example)
-#     em vez de valores fixos de dev.
-#   - `core-api` é o único serviço yamabiko dual-homed: fica na rede default
-#     deste projeto (fala com postgres/stt-service/voicevox/piper) E na
-#     `shared_net` externa (pra o container `web`/nginx do Ascend alcançá-lo
-#     como http://core-api:8080).
+#     dev/Tailscale) — em produção o TLS é terminado pelo Caddy.
+#   - Segredos (POSTGRES_PASSWORD, JWT_SECRET) vêm de variáveis de ambiente
+#     do CI (GitHub Secrets), não de .env.prod nem de valores fixos de dev.
+#   - `web` builda e serve o frontend via nginx próprio (Dockerfile.prod),
+#     ao invés do esquema antigo de publicar num volume externo montado
+#     pelo nginx de outro projeto (Ascend, que não roda nesta VM).
 #
 # Uso:
-#   docker network create shared_net          # uma vez só, se ainda não existir
-#   docker volume create yamabiko_web_dist     # uma vez só, se ainda não existir
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod build
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm web-static
+#   docker compose -f docker-compose.prod.yml up -d --build
 
 services:
   stt-service:
@@ -46,7 +40,7 @@ services:
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-yamabiko}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD precisa estar setado em .env.prod}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD precisa estar setado}
       - POSTGRES_DB=${POSTGRES_DB:-yamabiko}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -60,16 +54,16 @@ services:
   core-api:
     build: ./core-api
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-yamabiko}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD precisa estar setado em .env.prod}@postgres:5432/${POSTGRES_DB:-yamabiko}?sslmode=disable
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET precisa estar setado em .env.prod}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-yamabiko}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD precisa estar setado}@postgres:5432/${POSTGRES_DB:-yamabiko}?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET precisa estar setado}
       - PORT=8080
       - STT_SERVICE_URL=http://stt-service:8000
       - VOICEVOX_URL=http://voicevox:50021
       - PIPER_URL=piper:10200
       - AUDIO_CACHE_DIR=/app/audio-cache
-      # Same-origin via nginx do Ascend (ver BUILD_STATE.md) — o browser
-      # sempre fala com https://.../yamabiko-api/, nunca direto com este
-      # serviço, então nenhum CORS_ALLOWED_ORIGINS é necessário em produção.
+      # Same-origin via Caddy (yamabiko.duckdns.org/api/* -> core-api) — o
+      # browser nunca fala direto com este serviço, então nenhum
+      # CORS_ALLOWED_ORIGINS é necessário em produção.
       - CORS_ALLOWED_ORIGINS=
       - CORS_ALLOW_LOCAL_NETWORK=false
     volumes:
@@ -89,36 +83,29 @@ services:
     # isso o core-api perderia acesso a postgres/stt-service/voicevox/piper.
     networks:
       default:
-      shared_net:
+      shared-services:
 
-  # One-shot: builda o frontend (vite build, base '/yamabiko/', API relativa
-  # a '/yamabiko-api/') e publica o dist/ no volume externo que o container
-  # `web` do Ascend monta read-only em /usr/share/nginx/html/yamabiko (ver
-  # ascend/docker-compose.yml). Não fica de pé — roda e sai. Rodar de novo
-  # (`docker compose -f docker-compose.prod.yml run --rm web-static`) é o
-  # único passo necessário pra publicar uma nova versão do frontend; nunca
-  # exige rebuild/restart do container do Ascend.
-  web-static:
+  web:
     build:
       context: ./web
       dockerfile: Dockerfile.prod
       args:
-        VITE_BASE_PATH: /yamabiko/
-        VITE_API_BASE_URL: /yamabiko-api
-    volumes:
-      - yamabiko_web_dist:/out
+        VITE_BASE_PATH: /
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    # Só precisa ser alcançável pelo Caddy — não fala com nenhum outro
+    # serviço deste projeto (as chamadas de API saem do browser pro Caddy,
+    # nunca container-a-container).
+    networks:
+      shared-services:
 
 volumes:
   whisper-models:
   postgres-data:
   audio-cache:
   piper-voices:
-  # External — mesmo volume que ascend/docker-compose.yml monta read-only.
-  yamabiko_web_dist:
-    external: true
 
 networks:
   default:
-  # External — mesma rede que ascend/docker-compose.yml usa pro serviço `web`.
-  shared_net:
+  shared-services:
     external: true

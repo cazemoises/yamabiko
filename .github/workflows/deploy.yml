@@ -22,13 +22,12 @@ jobs:
           # ignorados a cada deploy — clean: false preserva o que já está lá.
           clean: false
 
-      - name: Ensure external network/volume exist
+      - name: Ensure external network exists
         run: |
-          docker network inspect shared_net >/dev/null 2>&1 || docker network create shared_net
-          docker volume inspect yamabiko_web_dist >/dev/null 2>&1 || docker volume create yamabiko_web_dist
+          docker network inspect shared-services >/dev/null 2>&1 || docker network create shared-services
 
-      - name: Build and start backend services
-        run: docker compose -f docker-compose.prod.yml up -d --build stt-service voicevox piper postgres core-api
+      - name: Build and start all services
+        run: docker compose -f docker-compose.prod.yml up -d --build stt-service voicevox piper postgres core-api web
 
       - name: Health check - postgres
         run: |
@@ -56,5 +55,14 @@ jobs:
           docker compose -f docker-compose.prod.yml logs core-api
           exit 1
 
-      - name: Publish frontend (web-static one-shot)
-        run: docker compose -f docker-compose.prod.yml run --rm web-static
+      - name: Health check - web
+        run: |
+          for i in $(seq 1 15); do
+            if docker compose -f docker-compose.prod.yml exec -T web wget -qO- http://localhost:80/ >/dev/null 2>&1; then
+              echo "web healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::web did not become healthy"
+          docker compose -f docker-compose.prod.yml logs web
+          exit 1
