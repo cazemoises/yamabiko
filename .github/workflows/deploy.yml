@@ -58,7 +58,9 @@ jobs:
       - name: Health check - web
         run: |
           for i in $(seq 1 15); do
-            if docker compose -f docker-compose.prod.yml exec -T web wget -qO- http://localhost:80/ >/dev/null 2>&1; then
+            cid=$(docker compose -f docker-compose.prod.yml ps -q web)
+            status=$(docker inspect --format='{{.State.Health.Status}}' "$cid" 2>/dev/null || echo "starting")
+            if [ "$status" = "healthy" ]; then
               echo "web healthy"; exit 0
             fi
             sleep 2
