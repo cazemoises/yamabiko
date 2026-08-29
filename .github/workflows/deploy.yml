@@ -7,6 +7,11 @@ on:
 jobs:
   deploy:
     runs-on: [self-hosted, linux]
+    env:
+      POSTGRES_USER: yamabiko
+      POSTGRES_DB: yamabiko
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +28,6 @@ jobs:
           docker volume inspect yamabiko_web_dist >/dev/null 2>&1 || docker volume create yamabiko_web_dist
 
       - name: Build and start backend services
-        env:
-          POSTGRES_USER: yamabiko
-          POSTGRES_DB: yamabiko
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: docker compose -f docker-compose.prod.yml up -d --build stt-service voicevox piper postgres core-api
 
       - name: Health check - postgres
@@ -57,9 +57,4 @@ jobs:
           exit 1
 
       - name: Publish frontend (web-static one-shot)
-        env:
-          POSTGRES_USER: yamabiko
-          POSTGRES_DB: yamabiko
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: docker compose -f docker-compose.prod.yml run --rm web-static
