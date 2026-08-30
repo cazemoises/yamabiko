@@ -90,8 +90,9 @@ services:
       context: ./web
       dockerfile: Dockerfile.prod
       args:
-        VITE_BASE_PATH: /
-        VITE_API_BASE_URL: /api
+        # ATUALIZADO: Prefixos ajustados para rodar na subpasta do portal
+        VITE_BASE_PATH: /yamabiko/
+        VITE_API_BASE_URL: /yamabiko/api
     restart: unless-stopped
     # HEALTHCHECK definido na imagem (ver web/Dockerfile.prod) — permite
     # checar `docker inspect --format='{{.State.Health.Status}}'`, mesmo
