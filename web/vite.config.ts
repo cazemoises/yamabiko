@@ -59,7 +59,6 @@ export default defineConfig(({ mode }) => {
     // VITE_BASE_PATH setado (dev normal, ou preview local), cai pro '/'
     // de sempre. Passado via build ARG em web/Dockerfile.prod, não hardcoded
     // aqui, porque dev/e2e nunca devem rodar sob esse prefixo.
-    base: env.VITE_BASE_PATH || '/',
     server: {
       // host: true == '0.0.0.0' — o dev server escuta em todas as interfaces
       // de rede, não só localhost, pra dar pra abrir o app de outro
