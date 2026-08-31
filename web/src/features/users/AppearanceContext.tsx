@@ -22,6 +22,19 @@ interface AppearanceContextValue {
 
 const AppearanceContext = createContext<AppearanceContextValue | undefined>(undefined);
 
+// Chave compartilhada com o portal (mesma origem) e o Ascend — só assume
+// 'light'/'dark', nunca 'system', pra manter o contrato simples entre os apps.
+const SHARED_THEME_KEY = "theme";
+
+function readSharedTheme(): "light" | "dark" | null {
+  try {
+    const v = localStorage.getItem(SHARED_THEME_KEY);
+    return v === "light" || v === "dark" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 function applyToDocument(theme: string, accentColor: string): void {
   const root = document.documentElement;
   if (theme) root.setAttribute("data-theme", theme);
@@ -46,11 +59,26 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState("");
   const [accentColor, setAccentColorState] = useState("");
 
+  // Aplica o tema compartilhado (gravado pelo portal ou pelo Ascend) assim
+  // que o app monta, antes mesmo do fetch do perfil — evita flash e serve
+  // de fonte de verdade quando embutido no portal.
+  useEffect(() => {
+    const shared = readSharedTheme();
+    if (shared) {
+      setThemeState(shared);
+      applyToDocument(shared, accentColor);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (status !== "authenticated") return;
     getProfile()
       .then((profile) => {
-        const t = profile.theme ?? "";
+        // O valor compartilhado (se existir) tem prioridade sobre o backend —
+        // é a fonte de verdade quando o app está embutido no portal.
+        const shared = readSharedTheme();
+        const t = shared ?? profile.theme ?? "";
         const a = profile.accent_color ?? "";
         setThemeState(t);
         setAccentColorState(a);
@@ -59,10 +87,31 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [status]);
 
+  // Reage a mudanças da chave compartilhada feitas por outro browsing
+  // context de mesma origem (portal ou Ascend) — nunca dispara na aba que
+  // fez a escrita, então não há risco de loop com setTheme abaixo.
+  useEffect(() => {
+    function handleStorage(e: StorageEvent): void {
+      if (e.key !== SHARED_THEME_KEY) return;
+      const next = e.newValue === "light" || e.newValue === "dark" ? e.newValue : "";
+      setThemeState(next);
+      applyToDocument(next, accentColor);
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [accentColor]);
+
   function setTheme(next: string): void {
     setThemeState(next);
     applyToDocument(next, accentColor);
     void patchAppearance({ theme: next });
+    if (next === "light" || next === "dark") {
+      try {
+        localStorage.setItem(SHARED_THEME_KEY, next);
+      } catch {
+        // ignore
+      }
+    }
   }
 
   function setAccentColor(next: string): void {
