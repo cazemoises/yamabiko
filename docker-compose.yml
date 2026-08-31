@@ -78,9 +78,14 @@ services:
       - "9001:8080"
     environment:
       - DATABASE_URL=postgres://yamabiko:yamabiko@postgres:5432/yamabiko?sslmode=disable
-      - JWT_SECRET=dev-secret-troque-em-producao
       - PORT=8080
       - STT_SERVICE_URL=http://stt-service:8000
+      # Sem Pangolin na frente em dev local — sem isso, toda requisição
+      # levaria 401 (RequireAuth exige o header Remote-Email que só o
+      # Pangolin injeta em produção, ver internal/auth/context.go). Simula
+      # a identidade que o Pangolin mandaria; NUNCA setar em produção.
+      - DEV_FAKE_REMOTE_EMAIL=dev@localhost
+      - DEV_FAKE_REMOTE_NAME=Dev
       # https://caze.tailc68a7f.ts.net:5173 é o hostname MagicDNS do
       # Tailscale desta máquina (Sec. pedida pelo usuário — acesso via HTTPS
       # real, necessário pro getUserMedia funcionar no Safari iOS, ver
@@ -90,7 +95,7 @@ services:
       # 6598), fora do que net.IP.IsPrivate() considera privado, e aqui é um
       # hostname (MagicDNS), não IP literal, de qualquer forma. Por isso
       # precisa entrar explicitamente na whitelist estática.
-      - CORS_ALLOWED_ORIGINS=http://localhost:5173,https://caze.tailc68a7f.ts.net:5173
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://192.168.0.106:5173,https://caze.tail3ffe94.ts.net:5173,https://caze.tail3ffe94.ts.net:5173
       # Dev-only (Sec. pedida pelo usuário — testar o `web` pelo celular na
       # mesma Wi-Fi): aceita qualquer origin http://<IP-de-rede-privada>,
       # SEM precisar fixar o IP da máquina aqui (ele muda a cada rede/DHCP

@@ -1,18 +1,86 @@
 # BUILD STATE
 
 ## Fase atual: 6 / 6 — CONCLUÍDA. Web validado em browser real. MVP end-to-end completo.
-Trabalho pós-MVP mais recente: **seed de scenarios en-US** (migration 0019, ver "Última ação" abaixo) —
-corrigiu os 30 exercícios de inglês que existiam no banco mas nunca apareciam na UI. Antes disso: login por
-PIN numérico (tela de seleção de perfil) + deploy de produção same-origin no nginx compartilhado do Ascend +
-suporte multi-idioma (ja-JP + en-US) + cenários (scenarios) + sistema de seleção de voz com preview +
-catálogo de vozes ampliado + fix de CORS pra PATCH + backend dos 7 novos tipos de exercício (FASE A) +
-import do design `Yamabiko.dc.html` e substituição completa do frontend (FASE B) + acesso via LAN em dev —
-**TUDO CONCLUÍDO**. Sem trabalho pendente conhecido; próxima sessão pode perguntar ao usuário o que
-priorizar em seguida (gamificação/SRS da Fase 6 original ainda não tem UI própria, e os 7 tipos novos de
-exercício não persistem tentativa — decisão de escopo documentada mais abaixo, revisitável). Ver "Última
-ação" pro trabalho mais recente e as seções seguintes pro histórico completo.
+Trabalho pós-MVP mais recente: **login por Pangolin (headers Remote-Email/Remote-Name)** substitui
+inteiramente PIN e email+senha (ver "Última ação" abaixo). Antes disso: seed de scenarios en-US (migration
+0019) + deploy de produção same-origin no nginx compartilhado do Ascend + suporte multi-idioma (ja-JP +
+en-US) + cenários (scenarios) + sistema de seleção de voz com preview + catálogo de vozes ampliado + fix de
+CORS pra PATCH + backend dos 7 novos tipos de exercício (FASE A) + import do design `Yamabiko.dc.html` e
+substituição completa do frontend (FASE B) + acesso via LAN em dev — **TUDO CONCLUÍDO**. Pendência real
+desta sessão: **verificação end-to-end via `docker compose` não foi possível** (Docker Desktop não estava
+rodando na máquina de dev) — só `go build`/`go test`/`tsc -b` foram confirmados, ver seção abaixo. Próxima
+sessão (ou o usuário) deve subir `docker compose up -d --build` e confirmar visualmente que
+`GET /users/me` autentica via `DEV_FAKE_REMOTE_EMAIL` antes de considerar esta mudança 100% validada. Ver
+"Última ação" pro trabalho mais recente e as seções seguintes pro histórico completo.
 
-## Última ação — Seed de scenarios en-US (migration 0019) — corrige exercícios de inglês invisíveis na UI
+## Última ação — Login via headers do Pangolin (Remote-Email/Remote-Name), remove PIN e email+senha
+
+**Pedido do usuário**: "o yamabiko agora roda na minha VM que tem um site rodando com newt e pangolin. não
+quero mais login com pin ou email e senha. quero usar os headers do pangolin". Confirmado com o usuário
+(pergunta feita, resposta: "SSO por pessoa") que cada pessoa loga no Pangolin com identidade própria (não
+um único acesso compartilhado) — `Remote-Email` mapeia 1:1 pro usuário correspondente no yamabiko.
+
+### O que o Pangolin realmente manda (verificado na doc oficial, não assumido)
+`docs.pangolin.net/manage/access-control/forwarded-headers`: `Remote-User`, `Remote-Email`, `Remote-Name`,
+`Remote-Role` — só existem pra SSO ou shareable link vinculado a usuário; **PIN/senha do próprio Pangolin
+não geram identidade nenhuma** (ficou documentado porque quase virou uma armadilha: se a resource tivesse
+sido protegida por PIN do Pangolin em vez de SSO, nenhum header existiria e essa mudança inteira não
+funcionaria — daí a pergunta feita ao usuário antes de escrever qualquer código).
+
+### O que foi feito
+- **`core-api/internal/auth`**: reescrito quase por completo. Removidos `handler.go`, `service.go`,
+  `jwt.go`, `password.go`, `pin.go` (e respectivos `_test.go`) e `user.go` — não sobrou NENHUM código de
+  senha/PIN/JWT no core-api, decisão deliberada (Sec. 9 do CLAUDE.md: sem sobra de código de mecanismo não
+  mais usado). `context.go` agora expõe `RequireAuth(repo UserRepository)`: lê `Remote-Email` do header, 401
+  se ausente/em branco, resolve (ou cria, primeiro acesso) o usuário via `repo.FindOrCreateByEmail` e injeta
+  o `userID` no contexto — mesma chave/`UserIDFromContext` de antes, então `users`/`tts`/`dashboard`/
+  `attempts` não precisaram mudar nada.
+- **`core-api/internal/auth/postgres_repository.go`**: `FindOrCreateByEmail` — `SELECT` por email, `INSERT`
+  na hora se não existir (sem fluxo de registro separado; `name` só é usado na criação).
+- **Migration `0020_drop_password_and_pin_auth`**: `DROP COLUMN` de `password_hash`, `pin_hash`,
+  `pin_failed_attempts`, `pin_locked_until`. `accent_color` foi mantida — virou preferência de aparência
+  genuína na migration `0017`, não é mais só decoração da tela de PIN removida.
+- **`internal/config`**: `JWT_SECRET` deixou de ser obrigatório (removido de `Config`/`Load`). Novo
+  `DEV_FAKE_REMOTE_EMAIL`/`DEV_FAKE_REMOTE_NAME` (opcional, vazio por padrão) — em dev local sem Pangolin na
+  frente, `httpserver.devIdentityOverride` injeta esses valores como Remote-Email/Remote-Name antes de
+  `RequireAuth`, simulando o Pangolin. **Nunca setar essas env vars em produção** — lá a identidade só deve
+  vir de uma requisição que realmente atravessou o Pangolin.
+- **`httpserver.NewRouter`**: assinatura mudou (recebe `auth.UserRepository` em vez de `*auth.Handler` +
+  `*auth.JWTIssuer`, mais os 2 novos parâmetros de dev override). Rotas `/auth/register`, `/auth/login`,
+  `/auth/refresh`, `/auth/pin-login`, `/auth/profiles`, `/auth/pin-setup` — todas removidas. Não existe mais
+  nenhuma rota de login: toda requisição autenticada já chega com identidade resolvida.
+- **`web/src/features/auth`**: `ProfileSelectPage.tsx`, `LoginPage.tsx`, `RegisterPage.tsx`, `profilesApi.ts`
+  e `lib/auth.ts` (armazenamento de token) — todos deletados. `AuthContext` agora só expõe `status`
+  (`"checking" | "authenticated" | "unauthenticated"`), resolvido chamando `GET /users/me` uma vez ao montar
+  — é a única forma de saber se a sessão é válida, já que o browser NUNCA vê os headers Remote-* (eles só
+  existem no trecho Pangolin → core-api). `apiClient.ts` perdeu toda a lógica de Bearer token + retry de
+  refresh; toda requisição agora manda `credentials: "include"` (cookie de sessão do Pangolin precisa via-
+  jar pra ele continuar injetando os headers).
+- **`AppShell`**: botão "Sair" removido — pesquisado se o Pangolin expõe uma URL de logout previsível pro
+  resource (não expõe nenhuma conhecida/estável; RP-Initiated Logout pra OIDC é um gap aberto do projeto,
+  ver github.com/orgs/fosrl/discussions/2405) — construir um botão que não funciona seria pior que não ter
+  botão. Se o usuário quiser encerrar sessão, é pelo próprio portal do Pangolin. Revisitável se o Pangolin
+  ganhar essa feature ou se o usuário disser a URL certa.
+- **`.github/workflows/deploy.yml`**, **`docker-compose.prod.yml`**, **`docker-compose.yml`**,
+  **`.env.prod.example`**: `JWT_SECRET` removido de todo lugar. `docker-compose.yml` (dev) ganhou
+  `DEV_FAKE_REMOTE_EMAIL=dev@localhost` fixo — sem isso, `docker compose up` local ficaria 100% inacessível
+  (todo request bate 401 sem Pangolin na frente).
+- **e2e (Playwright)**: `token-refresh.spec.ts` deletado inteiro (testava o interceptor de refresh, que não
+  existe mais). `seedTokensOnce` removido de `helpers.ts` e de todos os 8 specs que chamavam — `mockProfile`
+  (mock de `GET /users/me`) já era suficiente, token nenhum é lido pelo app agora.
+
+### Débito/risco conhecido, documentado deliberadamente (não decidido sozinho por ser fora do repo)
+- **Confiar no header Remote-Email pressupõe que o core-api só é alcançável através do Pangolin** — nenhuma
+  porta publicada em `docker-compose.prod.yml` (já era assim antes desta mudança), mas isso só é uma
+  garantia real se mais nenhum container na rede `shared-services` externa consegue falar direto com
+  `core-api:8080` contornando o Pangolin. Essa rede é configurada na VM, fora deste repo — não dá pra
+  verificar daqui. **Se qualquer outro serviço tiver acesso a essa rede, ele pode forjar Remote-Email
+  livremente.** Vale o usuário confirmar isso na VM antes de considerar essa mudança segura em produção.
+- Não foi possível confirmar se o nginx/Caddy que hoje serve `/yamabiko/api/*` (comentário de
+  `docker-compose.prod.yml` ainda cita "Caddy") repassa os headers Remote-* sem filtrar — proxy_pass do
+  nginx repassa headers de entrada por padrão, mas isso não foi testado ao vivo nesta sessão.
+
+## Última ação (anterior) — Seed de scenarios en-US (migration 0019) — corrige exercícios de inglês invisíveis na UI
 
 **Causa raiz confirmada**: a migration `0013_create_scenarios` criou a tabela `scenarios` e as colunas
 `scenario_id`/`order_in_scenario` em `exercises`, e a `0014_seed_scenarios_japanese_pilot` populou 3

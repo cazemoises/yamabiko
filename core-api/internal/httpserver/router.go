@@ -20,8 +20,7 @@ import (
 )
 
 func NewRouter(
-	authHandler *auth.Handler,
-	tokens *auth.JWTIssuer,
+	authRepo auth.UserRepository,
 	exercisesHandler *exercises.Handler,
 	attemptsHandler *attempts.Handler,
 	usersHandler *users.Handler,
@@ -30,6 +29,8 @@ func NewRouter(
 	scenariosHandler *scenarios.Handler,
 	corsAllowedOrigins []string,
 	corsAllowLocalNetwork bool,
+	devFakeRemoteEmail string,
+	devFakeRemoteName string,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
@@ -41,26 +42,16 @@ func NewRouter(
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	r.Route("/auth", func(r chi.Router) {
-		r.Get("/profiles", authHandler.Profiles)
-		r.Post("/register", authHandler.Register)
-		r.Post("/login", authHandler.Login)
-		r.Post("/refresh", authHandler.Refresh)
-		r.Post("/pin-login", authHandler.PinLogin)
-
-		// pin-setup fica sob /auth (não /users/me) porque é sobre o
-		// mecanismo de login em si, não um dado de perfil — mas exige o
-		// mesmo Authorization: Bearer que o resto das rotas autenticadas
-		// (Sec. 4 do pedido do usuário: "protegido pelo JWT normal").
-		r.Group(func(r chi.Router) {
-			r.Use(appmiddleware.RequireAuth(tokens))
-			r.Post("/pin-setup", authHandler.PinSetup)
-		})
-	})
-
-	// Todas as rotas abaixo exigem Authorization: Bearer {access_token} (Sec. 4 do CLAUDE.md).
+	// Todas as rotas abaixo exigem o header Remote-Email injetado pelo
+	// Pangolin (Sec. pedida pelo usuário — substitui o antigo Bearer JWT,
+	// ver internal/auth/context.go). Não há mais /auth/register,
+	// /auth/login, /auth/pin-login nem /auth/refresh: a identidade já
+	// chega pronta em toda requisição que atravessou o Pangolin.
 	r.Group(func(r chi.Router) {
-		r.Use(appmiddleware.RequireAuth(tokens))
+		if devFakeRemoteEmail != "" {
+			r.Use(devIdentityOverride(devFakeRemoteEmail, devFakeRemoteName))
+		}
+		r.Use(appmiddleware.RequireAuth(authRepo))
 
 		r.Route("/users/me", func(r chi.Router) {
 			r.Get("/", usersHandler.Me)
@@ -95,6 +86,23 @@ func NewRouter(
 	return r
 }
 
+// devIdentityOverride simula o que o Pangolin faz em produção — só usada
+// em dev local sem Pangolin na frente (env DEV_FAKE_REMOTE_EMAIL, ver
+// internal/config/config.go). Sobrescreve qualquer Remote-Email/Remote-Name
+// que porventura já viesse na requisição, então nunca setar essa env var
+// atrás de um Pangolin de verdade.
+func devIdentityOverride(email, name string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set(auth.HeaderRemoteEmail, email)
+			if name != "" {
+				r.Header.Set(auth.HeaderRemoteName, name)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // corsOptions é a fonte única de verdade da config de CORS — extraída pra
 // função própria pra ser testável sem precisar instanciar todos os handlers
 // reais do NewRouter (que exigem repositórios Postgres). AllowedMethods
@@ -118,7 +126,7 @@ func NewRouter(
 func corsOptions(allowedOrigins []string, allowLocalNetwork bool) cors.Options {
 	opts := cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}

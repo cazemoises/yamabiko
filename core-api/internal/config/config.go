@@ -4,15 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 )
 
 type Config struct {
 	Port                  string
 	DatabaseURL           string
-	JWTSecret             string
-	AccessTokenTTL        time.Duration
-	RefreshTokenTTL       time.Duration
 	STTServiceURL         string
 	CORSAllowedOrigins    []string
 	CORSAllowLocalNetwork bool
@@ -29,6 +25,15 @@ type Config struct {
 	// basta, o core-api também precisa falar TLS no mesmo hostname.
 	TLSCertFile string
 	TLSKeyFile  string
+	// DevFakeRemoteEmail/DevFakeRemoteName (env DEV_FAKE_REMOTE_EMAIL/
+	// DEV_FAKE_REMOTE_NAME) — só pra dev local sem Pangolin na frente (ver
+	// httpserver.NewRouter): quando setado, injeta esses valores como
+	// Remote-Email/Remote-Name em toda requisição antes de RequireAuth,
+	// simulando o que o Pangolin faria em produção. NUNCA setar em
+	// produção — lá o header real só existe se a requisição realmente
+	// atravessou o Pangolin.
+	DevFakeRemoteEmail string
+	DevFakeRemoteName  string
 }
 
 // TLSEnabled é true só quando os 2 arquivos estão configurados — usar só um
@@ -39,11 +44,6 @@ func (c *Config) TLSEnabled() bool {
 }
 
 func Load() (*Config, error) {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		return nil, fmt.Errorf("JWT_SECRET não configurado")
-	}
-
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL não configurado")
@@ -87,9 +87,6 @@ func Load() (*Config, error) {
 	return &Config{
 		Port:                  port,
 		DatabaseURL:           dbURL,
-		JWTSecret:             secret,
-		AccessTokenTTL:        15 * time.Minute,
-		RefreshTokenTTL:       7 * 24 * time.Hour,
 		STTServiceURL:         sttServiceURL,
 		CORSAllowedOrigins:    corsAllowedOrigins(),
 		CORSAllowLocalNetwork: corsAllowLocalNetwork(),
@@ -98,6 +95,8 @@ func Load() (*Config, error) {
 		AudioCacheDir:         audioCacheDir,
 		TLSCertFile:           tlsCertFile,
 		TLSKeyFile:            tlsKeyFile,
+		DevFakeRemoteEmail:    os.Getenv("DEV_FAKE_REMOTE_EMAIL"),
+		DevFakeRemoteName:     os.Getenv("DEV_FAKE_REMOTE_NAME"),
 	}, nil
 }
 

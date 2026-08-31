@@ -42,12 +42,12 @@ function applyToDocument(theme: string, accentColor: string): void {
 // pro backend em paralelo, sem esperar a resposta pra já trocar a cor na
 // tela (mesma UX de outras preferências do app, ex: seleção de voz).
 export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { status } = useAuth();
   const [theme, setThemeState] = useState("");
   const [accentColor, setAccentColorState] = useState("");
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (status !== "authenticated") return;
     getProfile()
       .then((profile) => {
         const t = profile.theme ?? "";
@@ -57,7 +57,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         applyToDocument(t, a);
       })
       .catch(() => {});
-  }, [isAuthenticated]);
+  }, [status]);
 
   function setTheme(next: string): void {
     setThemeState(next);

@@ -1,10 +1,10 @@
 package middleware_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -12,9 +12,17 @@ import (
 	"github.com/yamabiko/core-api/internal/middleware"
 )
 
-func TestRequireAuth_RejectsMissingToken(t *testing.T) {
-	issuer := auth.NewJWTIssuer("secret", time.Minute, time.Hour)
-	handler := middleware.RequireAuth(issuer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// fakeUserRepository cobre só o suficiente pra exercitar o reexport de
+// middleware.RequireAuth/UserIDFromContext — o comportamento em si já é
+// coberto a fundo em internal/auth/context_test.go.
+type fakeUserRepository struct{}
+
+func (fakeUserRepository) FindOrCreateByEmail(_ context.Context, _, _ string) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func TestRequireAuth_RejectsMissingRemoteEmail(t *testing.T) {
+	handler := middleware.RequireAuth(fakeUserRepository{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -27,50 +35,22 @@ func TestRequireAuth_RejectsMissingToken(t *testing.T) {
 	}
 }
 
-func TestRequireAuth_RejectsRefreshTokenAsAccess(t *testing.T) {
-	issuer := auth.NewJWTIssuer("secret", time.Minute, time.Hour)
-	refreshToken, err := issuer.IssueTokenPair(uuid.New())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	handler := middleware.RequireAuth(issuer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/users/me", nil)
-	req.Header.Set("Authorization", "Bearer "+refreshToken.RefreshToken)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("esperava 401, veio %d", rec.Code)
-	}
-}
-
-func TestRequireAuth_AllowsValidAccessToken(t *testing.T) {
-	issuer := auth.NewJWTIssuer("secret", time.Minute, time.Hour)
-	userID := uuid.New()
-	accessToken, err := issuer.IssueAccessToken(userID)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
+func TestRequireAuth_AllowsValidRemoteEmail(t *testing.T) {
 	var gotUserID uuid.UUID
-	handler := middleware.RequireAuth(issuer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := middleware.RequireAuth(fakeUserRepository{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotUserID, _ = middleware.UserIDFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/users/me", nil)
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set(auth.HeaderRemoteEmail, "vitoria@example.com")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("esperava 200, veio %d", rec.Code)
 	}
-	if gotUserID != userID {
-		t.Fatalf("esperava userID %v no contexto, veio %v", userID, gotUserID)
+	if gotUserID == uuid.Nil {
+		t.Fatal("esperava userID não-nulo no contexto")
 	}
 }

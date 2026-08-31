@@ -17,9 +17,9 @@ const NAV_ITEMS = [
 // implementações React separadas. Os dois containers ficam sempre no DOM;
 // display:none esconde o que não é da faixa de largura atual.
 export function AppShell({ children }: { children: ReactNode }) {
-  const { isAuthenticated, logout } = useAuth();
+  const { status } = useAuth();
 
-  if (!isAuthenticated) {
+  if (status !== "authenticated") {
     return <div className="auth-content">{children}</div>;
   }
 
@@ -40,10 +40,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </div>
-        <button type="button" className="sidebar-nav-item sidebar-nav-exit" onClick={logout}>
-          <ExitIcon />
-          <span>Sair</span>
-        </button>
       </nav>
 
       <div className="app-content">{children}</div>
@@ -60,10 +56,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span>{label}</span>
           </NavLink>
         ))}
-        <button type="button" className="bottom-nav-item" onClick={logout}>
-          <ExitIcon />
-          <span>Sair</span>
-        </button>
       </nav>
     </div>
   );
@@ -112,15 +104,6 @@ function VoiceIcon() {
     <svg width="18" height="18" viewBox="0 0 18 18">
       <circle cx="9" cy="9" r="3" fill="none" strokeWidth="1.4" />
       <circle cx="9" cy="9" r="7" fill="none" strokeWidth="1" />
-    </svg>
-  );
-}
-
-function ExitIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18">
-      <path d="M7 3H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" fill="none" strokeWidth="1.4" />
-      <path d="M11 6l4 3-4 3M15 9H6" fill="none" strokeWidth="1.4" />
     </svg>
   );
 }

@@ -11,7 +11,6 @@ jobs:
       POSTGRES_USER: yamabiko
       POSTGRES_DB: yamabiko
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

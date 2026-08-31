@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile } from "./helpers";
 
 const EXERCISE = {
   id: "ex-1",
@@ -35,7 +35,6 @@ test("resultado do desafio destaca a divergência, mostra romaji e explica em po
   });
 
   await mockProfile(page);
-  await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto(`/exercises/${EXERCISE.id}`);
   await expect(page.getByText(EXERCISE.prompt_pt)).toBeVisible();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, seedTokensOnce } from "./helpers";
+import { API_BASE_URL } from "./helpers";
 
 // Mesmo WAV mínimo sintético usado em reference-audio.spec.ts — precisa ser
 // um arquivo de verdade (não bytes arbitrários) pra <audio>.play() não
@@ -73,7 +73,6 @@ test("seletor de voz: mostra a preferência salva, toca preview, e salva nova se
     await route.fulfill({ status: 204 });
   });
 
-  await seedTokensOnce(page, "valid-token", "valid-refresh-token");
   await page.goto("/settings/voice");
 
   await expect(page.getByText("Locutor(a) Neutro(a)")).toBeVisible();

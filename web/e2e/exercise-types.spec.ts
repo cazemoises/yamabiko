@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile } from "./helpers";
 
 // Cobre pelo menos 1 exercício de cada exercise_type ponta a ponta
 // (pergunta -> resposta -> resultado real), rodando o MESMO conjunto de
@@ -240,7 +240,6 @@ function registerCases(viewportLabel: string): void {
       });
 
       await mockProfile(page);
-      await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
       await page.goto(`/exercises/${exerciseId}`);
       await expect(page.getByText(testCase.initialText ?? (testCase.exercise.prompt_pt as string))).toBeVisible();
@@ -256,7 +255,6 @@ test.describe("mobile (390x844)", () => {
 
   test("bottom nav visível, sidebar escondida", async ({ page }) => {
     await mockProfile(page);
-    await seedTokensOnce(page, "valid-token", "valid-refresh-token");
     await page.goto("/");
     await expect(page.locator(".bottom-nav")).toBeVisible();
     await expect(page.locator(".sidebar-nav")).toBeHidden();
@@ -270,7 +268,6 @@ test.describe("desktop (1440x900)", () => {
 
   test("sidebar visível, bottom nav escondida", async ({ page }) => {
     await mockProfile(page);
-    await seedTokensOnce(page, "valid-token", "valid-refresh-token");
     await page.goto("/");
     await expect(page.locator(".sidebar-nav")).toBeVisible();
     await expect(page.locator(".bottom-nav")).toBeHidden();

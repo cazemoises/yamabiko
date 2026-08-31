@@ -55,7 +55,6 @@ services:
     build: ./core-api
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-yamabiko}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD precisa estar setado}@postgres:5432/${POSTGRES_DB:-yamabiko}?sslmode=disable
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET precisa estar setado}
       - PORT=8080
       - STT_SERVICE_URL=http://stt-service:8000
       - VOICEVOX_URL=http://voicevox:50021

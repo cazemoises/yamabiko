@@ -3,23 +3,17 @@ package auth
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 )
 
-var (
-	ErrUserNotFound = errors.New("usuário não encontrado")
-	ErrEmailTaken   = errors.New("email já cadastrado")
-)
+var ErrUserNotFound = errors.New("usuário não encontrado")
 
+// UserRepository resolve a identidade confiada pelos headers do Pangolin
+// (ver context.go) pro usuário correspondente no yamabiko — sem senha nem
+// PIN, o Pangolin já fez a autenticação antes da requisição chegar aqui.
 type UserRepository interface {
-	Create(ctx context.Context, user *User) error
-	FindByEmail(ctx context.Context, email string) (*User, error)
-	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
-	// ListPinEnabledProfiles alimenta GET /auth/profiles — só usuários com
-	// pin_hash configurado, sem nenhum dado sensível na projeção.
-	ListPinEnabledProfiles(ctx context.Context) ([]PinProfile, error)
-	UpdatePinAuthState(ctx context.Context, userID uuid.UUID, failedAttempts int, lockedUntil *time.Time) error
-	SetPinHash(ctx context.Context, userID uuid.UUID, hash string) error
+	// FindOrCreateByEmail devolve o ID do usuário com esse email, criando-o
+	// na hora (com `name`) se for o primeiro acesso dessa pessoa.
+	FindOrCreateByEmail(ctx context.Context, email, name string) (uuid.UUID, error)
 }

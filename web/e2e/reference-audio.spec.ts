@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile } from "./helpers";
 
 // WAV mínimo (mono, 8-bit PCM, 8kHz) com silêncio — precisa ser um arquivo de
 // verdade (não bytes arbitrários) pra <audio>.play() não rejeitar por erro de
@@ -50,7 +50,6 @@ async function assertReferenceAudioPlaysViaAudioElement(page: Page, exercise: Ex
   });
 
   await mockProfile(page);
-  await seedTokensOnce(page, "valid-token", "valid-refresh-token");
 
   await page.goto(`/exercises/${exercise.id}`);
   await expect(page.getByText(exercise.prompt_pt)).toBeVisible();

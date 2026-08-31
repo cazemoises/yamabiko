@@ -1,48 +1,32 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "../../lib/apiClient";
-import { saveTokens, clearTokens, isAuthenticated as checkIsAuthenticated, type TokenPair } from "../../lib/auth";
+
+// Sem login algum no app: a identidade vem inteiramente dos headers
+// Remote-Email/Remote-Name que o Pangolin injeta antes de encaminhar a
+// requisição pro core-api (Sec. pedida pelo usuário — "não quero mais
+// login com pin ou email e senha, quero usar os headers do pangolin"). O
+// browser não vê esses headers (só existem no trecho Pangolin -> core-api),
+// então o único jeito de saber se a sessão é válida é perguntar pro
+// backend — daí este contexto só chamar GET /users/me uma vez ao montar.
+type AuthStatus = "checking" | "authenticated" | "unauthenticated";
 
 interface AuthContextValue {
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  pinLogin: (userId: string, pin: string) => Promise<void>;
-  logout: () => void;
+  status: AuthStatus;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authenticated, setAuthenticated] = useState(checkIsAuthenticated());
+  const [status, setStatus] = useState<AuthStatus>("checking");
 
-  async function login(email: string, password: string): Promise<void> {
-    const tokens = await api.post<TokenPair>("/auth/login", { email, password });
-    saveTokens(tokens);
-    setAuthenticated(true);
-  }
+  useEffect(() => {
+    api
+      .get("/users/me")
+      .then(() => setStatus("authenticated"))
+      .catch(() => setStatus("unauthenticated"));
+  }, []);
 
-  async function register(email: string, password: string, name: string): Promise<void> {
-    const tokens = await api.post<TokenPair>("/auth/register", { email, password, name });
-    saveTokens(tokens);
-    setAuthenticated(true);
-  }
-
-  async function pinLogin(userId: string, pin: string): Promise<void> {
-    const tokens = await api.post<TokenPair>("/auth/pin-login", { user_id: userId, pin });
-    saveTokens(tokens);
-    setAuthenticated(true);
-  }
-
-  function logout(): void {
-    clearTokens();
-    setAuthenticated(false);
-  }
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated: authenticated, login, register, pinLogin, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ status }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

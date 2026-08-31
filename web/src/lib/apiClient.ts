@@ -1,5 +1,3 @@
-import { clearTokens, getAccessToken, getRefreshToken, setAccessToken } from "./auth";
-
 // Porta do core-api em dev — fixa porque é a mesma em qualquer rede (mapeada
 // pelo docker-compose, "9001:8080"); só o HOST varia (localhost, IP da LAN,
 // Tailscale). Ver CORE_API_DEV_PORT.
@@ -23,9 +21,6 @@ const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? defaultApiBase
 
 export class ApiError extends Error {
   status: number;
-  // Corpo bruto do erro (menos a chave "error", já usada como message) —
-  // pin-login devolve campos extras (attempts_remaining, retry_after_seconds)
-  // que a tela de PIN precisa pra UX de lockout/tentativas restantes.
   body?: Record<string, unknown>;
 
   constructor(status: number, message: string, body?: Record<string, unknown>) {
@@ -35,68 +30,21 @@ export class ApiError extends Error {
   }
 }
 
-// Requisições concorrentes que tomam 401 ao mesmo tempo devem compartilhar a
-// mesma chamada de refresh, não disparar uma pra cada uma.
-let refreshInFlight: Promise<string> | null = null;
-
-async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    throw new ApiError(401, "sem refresh token");
-  }
-
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, "refresh token inválido");
-  }
-
-  const body = (await response.json()) as { access_token: string };
-  setAccessToken(body.access_token);
-  return body.access_token;
-}
-
-function redirectToLogin(): void {
-  clearTokens();
-  // window.location, ao contrário de <Link>/navigate() do React Router,
-  // ignora o `basename` do BrowserRouter — precisa montar o caminho com
-  // import.meta.env.BASE_URL manualmente (ver main.tsx) pra funcionar sob
-  // /yamabiko/ em produção, não só na raiz.
-  window.location.assign(`${import.meta.env.BASE_URL}login`);
-}
-
-// requestRaw concentra a lógica de auth + retry de refresh compartilhada por
-// request() (respostas JSON) e requestBlob() (respostas binárias, ex: WAV do
-// endpoint de áudio de referência) — só o parsing do corpo de sucesso difere
-// entre as duas.
-async function requestRaw(path: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
-  const token = getAccessToken();
+// Sem Authorization/refresh: identidade vem dos headers que o Pangolin
+// injeta pro core-api (não pro browser), então o único requisito daqui é
+// mandar `credentials: "include"` pra requisição carregar o cookie de
+// sessão do Pangolin — sem ele o Pangolin não teria como reconhecer quem
+// está logado e não injetaria Remote-Email (ver
+// core-api/internal/auth/context.go). 401 aqui significa mesmo "sem
+// identidade válida", não "token expirado" — não há retry possível do lado
+// do browser.
+async function requestRaw(path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers);
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
   if (options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-
-  if (response.status === 401 && !isRetry && !path.startsWith("/auth/")) {
-    try {
-      refreshInFlight ??= refreshAccessToken().finally(() => {
-        refreshInFlight = null;
-      });
-      await refreshInFlight;
-    } catch {
-      redirectToLogin();
-      throw new ApiError(401, "sessão expirada");
-    }
-    return requestRaw(path, options, true);
-  }
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, credentials: "include" });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as { error?: string });

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE_URL, mockProfile, seedTokensOnce } from "./helpers";
+import { API_BASE_URL, mockProfile } from "./helpers";
 
 const EXERCISE = {
   id: "ex-1",
@@ -16,7 +16,6 @@ test("mostra um medidor de volume reagindo ao áudio captado durante a gravaçã
   });
 
   await mockProfile(page);
-  await seedTokensOnce(page, "valid-token", "valid-refresh-token");
   await page.goto(`/exercises/${EXERCISE.id}`);
 
   const meter = page.getByTestId("volume-meter");

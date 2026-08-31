@@ -40,9 +40,6 @@ func main() {
 	defer pool.Close()
 
 	authRepo := auth.NewPostgresRepository(pool)
-	issuer := auth.NewJWTIssuer(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
-	authService := auth.NewService(authRepo, issuer)
-	authHandler := auth.NewHandler(authService)
 
 	exercisesRepo := exercises.NewPostgresRepository(pool)
 	exercisesHandler := exercises.NewHandler(exercisesRepo)
@@ -67,7 +64,7 @@ func main() {
 	scenariosRepo := scenarios.NewPostgresRepository(pool)
 	scenariosHandler := scenarios.NewHandler(scenariosRepo, exercisesRepo)
 
-	router := httpserver.NewRouter(authHandler, issuer, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins, cfg.CORSAllowLocalNetwork)
+	router := httpserver.NewRouter(authRepo, exercisesHandler, attemptsHandler, usersHandler, dashboardHandler, ttsHandler, scenariosHandler, cfg.CORSAllowedOrigins, cfg.CORSAllowLocalNetwork, cfg.DevFakeRemoteEmail, cfg.DevFakeRemoteName)
 
 	if cfg.TLSEnabled() {
 		// HTTPS real (ex: certificado Tailscale, ver BUILD_STATE.md) —
