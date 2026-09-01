@@ -8,19 +8,17 @@ const LANGUAGES = [
   { value: "en-US", label: "Inglês" },
 ];
 
-const THEME_OPTIONS = [
-  { value: "", label: "Sistema" },
-  { value: "light", label: "Claro" },
-  { value: "dark", label: "Escuro" },
-];
-
 // Não é um frame do design (o Yamabiko.dc.html só tem um painel de Tweaks
 // pro preview do PRÓPRIO design, não uma tela de app pro usuário final) —
-// composição nossa sobre os mesmos tokens/primitivos (.theme-toggle já
-// existia pro toggle de idioma da voz), documentada como decisão em
-// BUILD_STATE.md.
+// composição nossa sobre os mesmos tokens/primitivos, documentada como
+// decisão em BUILD_STATE.md.
+//
+// Toggle de claro/escuro removido daqui — tema agora é global, controlado
+// só pela sidebar do Portal (ver PORTAL_SHELL_PROTOCOL.md no repo do
+// portal). A cor de acento continua sendo preferência própria do
+// Yamabiko: não é tema claro/escuro, é personalização por app.
 function AppearanceSection() {
-  const { theme, accentColor, setTheme, setAccentColor } = useAppearance();
+  const { accentColor, setAccentColor } = useAppearance();
   const [customHex, setCustomHex] = useState("");
 
   function applyCustomHex(): void {
@@ -30,20 +28,6 @@ function AppearanceSection() {
   return (
     <div className="appearance-section">
       <span className="section-title">Aparência</span>
-
-      <div className="theme-toggle" role="group" aria-label="Tema">
-        {THEME_OPTIONS.map((opt) => (
-          <button
-            key={opt.value || "system"}
-            type="button"
-            className={theme === opt.value ? "theme-toggle-button active" : "theme-toggle-button"}
-            aria-pressed={theme === opt.value}
-            onClick={() => setTheme(opt.value)}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
 
       <div className="accent-swatches">
         {ACCENT_PRESETS.map((preset) => (

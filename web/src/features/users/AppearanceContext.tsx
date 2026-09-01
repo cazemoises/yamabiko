@@ -14,9 +14,8 @@ export const ACCENT_PRESETS = [
 ];
 
 interface AppearanceContextValue {
-  theme: string; // "" = segue o sistema, "light", "dark"
+  theme: string; // "" = segue o sistema, "light", "dark" — só leitura, ver nota abaixo
   accentColor: string; // "" = default (terracota), "mono", ou "#RRGGBB"
-  setTheme: (theme: string) => void;
   setAccentColor: (accentColor: string) => void;
 }
 
@@ -88,8 +87,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, [status]);
 
   // Reage a mudanças da chave compartilhada feitas por outro browsing
-  // context de mesma origem (portal ou Ascend) — nunca dispara na aba que
-  // fez a escrita, então não há risco de loop com setTheme abaixo.
+  // context de mesma origem (Portal, hoje a única fonte — antes também
+  // podia ser o próprio Yamabiko ou o Ascend escrevendo, mas nenhum dos
+  // dois tem mais toggle de tema próprio) — nunca dispara na aba que fez
+  // a escrita, então não há risco de loop.
   useEffect(() => {
     function handleStorage(e: StorageEvent): void {
       if (e.key !== SHARED_THEME_KEY) return;
@@ -101,19 +102,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, [accentColor]);
 
-  function setTheme(next: string): void {
-    setThemeState(next);
-    applyToDocument(next, accentColor);
-    void patchAppearance({ theme: next });
-    if (next === "light" || next === "dark") {
-      try {
-        localStorage.setItem(SHARED_THEME_KEY, next);
-      } catch {
-        // ignore
-      }
-    }
-  }
-
   function setAccentColor(next: string): void {
     setAccentColorState(next);
     applyToDocument(theme, next);
@@ -121,7 +109,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppearanceContext.Provider value={{ theme, accentColor, setTheme, setAccentColor }}>
+    <AppearanceContext.Provider value={{ theme, accentColor, setAccentColor }}>
       {children}
     </AppearanceContext.Provider>
   );

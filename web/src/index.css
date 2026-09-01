@@ -184,124 +184,8 @@ textarea {
   padding: 32px 20px;
 }
 
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 12px 8px calc(env(safe-area-inset-bottom, 0px) + 12px);
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-  z-index: 10;
-}
-
-.bottom-nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-decoration: none;
-  color: var(--text-faint);
-  font-size: 10px;
-  font-weight: 600;
-  background: none;
-  border: none;
-  padding: 2px 6px;
-}
-
-.bottom-nav-item svg {
-  stroke: var(--text-faint);
-}
-
-.bottom-nav-item.active {
-  color: var(--text);
-}
-
-.bottom-nav-item.active svg {
-  stroke: var(--text);
-}
-
-.bottom-nav-item .nav-icon-fill {
-  fill: var(--text-faint);
-}
-
-.bottom-nav-item.active .nav-icon-fill {
-  fill: var(--text);
-}
-
-/* ---------- sidebar (desktop, ver breakpoint no fim do arquivo) ---------- */
-
-.sidebar-nav {
-  display: none; /* mostrado só no breakpoint desktop */
-  flex-direction: column;
-  width: 232px;
-  flex-shrink: 0;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  padding: 28px 16px;
-  border-right: 1px solid var(--border);
-  background: var(--bg);
-  box-sizing: border-box;
-}
-
-.sidebar-brand {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text);
-  padding: 0 10px;
-  margin-bottom: 28px;
-}
-
-.sidebar-nav-items {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sidebar-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  background: none;
-  border: none;
-  text-align: left;
-}
-
-.sidebar-nav-item svg {
-  stroke: var(--text-faint);
-  flex-shrink: 0;
-}
-
-.sidebar-nav-item:hover {
-  background: var(--bg-sunken);
-}
-
-.sidebar-nav-item.active {
-  color: var(--text);
-  background: var(--accent-soft);
-}
-
-.sidebar-nav-item.active svg {
-  stroke: var(--accent-text);
-}
-
-.sidebar-nav-item .nav-icon-fill {
-  fill: var(--text-faint);
-}
-
-.sidebar-nav-item.active .nav-icon-fill {
-  fill: var(--accent-text);
-}
+/* Sidebar/bottom-nav próprios removidos — navegação agora vive na sidebar
+   do Portal (ver components/layout/usePortalShellNav.ts). */
 
 /* ---------- topbar (exercício / resultado) ---------- */
 
@@ -423,6 +307,10 @@ textarea {
   height: 38px;
   border-radius: 10px;
   background: var(--accent-soft);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -1308,26 +1196,11 @@ textarea {
   color: var(--text-tertiary);
 }
 
-/* ---------- desktop (≥1024px): sidebar fixa em vez de bottom nav ----------
-   Mesmo componente (AppShell), mesmo NAV_ITEMS — só o container visível
-   muda por CSS. Conteúdo ganha mais respiro mas continua com largura
-   máxima legível (não estica card de leiaute mobile pra ocupar a tela
-   toda em 1920px) e fica ao lado da sidebar, não centralizado sozinho na
-   viewport inteira. */
+/* ---------- desktop (≥1024px) ----------
+   Sem sidebar/bottom-nav próprios pra alternar mais (ver nota acima) —
+   só o respiro do conteúdo muda: mais largura legível, sem esticar o
+   card de leiaute mobile pra ocupar a tela toda em 1920px. */
 @media (min-width: 1024px) {
-  .app-shell {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .sidebar-nav {
-    display: flex;
-  }
-
-  .bottom-nav {
-    display: none;
-  }
-
   .app-content {
     max-width: 640px;
     margin: 0 auto;

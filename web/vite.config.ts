@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    base: '/yamabiko/',
+    base: env.VITE_BASE_PATH || '/',
     plugins: [react()],
     // Same-origin deploy no nginx compartilhado do Ascend (ver
     // BUILD_STATE.md): o app fica servido em /yamabiko/, não na raiz, então

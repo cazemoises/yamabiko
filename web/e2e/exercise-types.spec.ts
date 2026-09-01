@@ -3,11 +3,14 @@ import { API_BASE_URL, mockProfile } from "./helpers";
 
 // Cobre pelo menos 1 exercício de cada exercise_type ponta a ponta
 // (pergunta -> resposta -> resultado real), rodando o MESMO conjunto de
-// casos em mobile (390x844) e desktop (1440x900) — o app shell muda
-// (bottom nav vs sidebar), a lógica de pergunta/resposta/resultado não.
-// Todos os exercícios de teste são standalone (sem scenario_id): o fluxo
-// de cenário (contexto + "Próximo") já tem cobertura própria em
-// scenario-flow.spec.ts, aqui o foco é validar cada tipo por si.
+// casos em mobile (390x844) e desktop (1440x900) — layout responsivo do
+// conteúdo muda entre as duas larguras, a lógica de pergunta/resposta/
+// resultado não. Navegação própria (sidebar/bottom nav) foi removida:
+// vive na sidebar do Portal agora (ver components/layout/AppShell.tsx e
+// usePortalShellNav.ts). Todos os exercícios de teste são standalone (sem
+// scenario_id): o fluxo de cenário (contexto + "Próximo") já tem
+// cobertura própria em scenario-flow.spec.ts, aqui o foco é validar cada
+// tipo por si.
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 const DESKTOP_VIEWPORT = { width: 1440, height: 900 };
@@ -253,11 +256,11 @@ function registerCases(viewportLabel: string): void {
 test.describe("mobile (390x844)", () => {
   test.use({ viewport: MOBILE_VIEWPORT });
 
-  test("bottom nav visível, sidebar escondida", async ({ page }) => {
+  test("não renderiza navegação própria — vive só na sidebar do Portal", async ({ page }) => {
     await mockProfile(page);
     await page.goto("/");
-    await expect(page.locator(".bottom-nav")).toBeVisible();
-    await expect(page.locator(".sidebar-nav")).toBeHidden();
+    await expect(page.locator(".bottom-nav")).toHaveCount(0);
+    await expect(page.locator(".sidebar-nav")).toHaveCount(0);
   });
 
   registerCases("mobile");
@@ -266,11 +269,11 @@ test.describe("mobile (390x844)", () => {
 test.describe("desktop (1440x900)", () => {
   test.use({ viewport: DESKTOP_VIEWPORT });
 
-  test("sidebar visível, bottom nav escondida", async ({ page }) => {
+  test("não renderiza navegação própria — vive só na sidebar do Portal", async ({ page }) => {
     await mockProfile(page);
     await page.goto("/");
-    await expect(page.locator(".sidebar-nav")).toBeVisible();
-    await expect(page.locator(".bottom-nav")).toBeHidden();
+    await expect(page.locator(".bottom-nav")).toHaveCount(0);
+    await expect(page.locator(".sidebar-nav")).toHaveCount(0);
   });
 
   registerCases("desktop");

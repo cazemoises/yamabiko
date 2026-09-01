@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { LanguageToggle } from "../../components/layout/LanguageToggle";
 import { getProfile, type Profile } from "../users/api";
 import { useScenariosProgress } from "../scenarios/useScenariosProgress";
+import { iconForScenario } from "../scenarios/scenarioIcon";
 
 // Home (Frame 1/2 do design) — saudação, cartão "continue de onde parou"
 // (o 1º cenário com progresso parcial) e uma tira "Em destaque" com os
@@ -45,10 +46,10 @@ export function HomePage() {
         <Link
           to={`/scenarios/${continueTarget.scenario.id}`}
           className="card"
-          style={{ background: "var(--text)", color: "var(--bg)", textDecoration: "none", display: "flex", flexDirection: "column", gap: 12 }}
+          style={{ background: "var(--accent-soft)", textDecoration: "none", display: "flex", flexDirection: "column", gap: 12 }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--accent-base)" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--accent-text)" }}>
               Cenário
             </span>
             <span style={{ fontSize: 12, opacity: 0.7 }}>
@@ -56,7 +57,7 @@ export function HomePage() {
             </span>
           </div>
           <span style={{ fontSize: 17, fontWeight: 700 }}>{continueTarget.scenario.title_pt}</span>
-          <div className="progress-track" style={{ background: "rgba(255,255,255,0.15)" }}>
+          <div className="progress-track">
             <div
               className="progress-fill"
               style={{ width: `${continueTarget.total ? (continueTarget.completed / continueTarget.total) * 100 : 0}%` }}
@@ -81,14 +82,18 @@ export function HomePage() {
             </Link>
           </div>
           <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
-            {featured.map(({ scenario, completed, total }) => (
+            {featured.map(({ scenario, completed, total }) => {
+              const Icon = iconForScenario(scenario.title_pt);
+              return (
               <Link
                 key={scenario.id}
                 to={`/scenarios/${scenario.id}`}
                 className="card"
                 style={{ minWidth: 168, textDecoration: "none", display: "flex", flexDirection: "column", gap: 10 }}
               >
-                <div className="list-row-icon" />
+                <div className="list-row-icon">
+                  <Icon size={18} strokeWidth={1.75} />
+                </div>
                 <span className="list-row-title" style={{ lineHeight: 1.3 }}>
                   {scenario.title_pt}
                 </span>
@@ -96,7 +101,8 @@ export function HomePage() {
                   {scenario.language === "ja-JP" ? "JA" : "EN"} · {completed}/{total}
                 </span>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

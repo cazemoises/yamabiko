@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { LanguageToggle } from "../../components/layout/LanguageToggle";
 import { useScenariosProgress } from "./useScenariosProgress";
+import { iconForScenario } from "./scenarioIcon";
 
 // Frame 3 do design — lista de cenários com progresso real (X de N
 // exercícios), sem categorias fixas mockadas (o filtro por category do
@@ -25,10 +26,13 @@ export function ScenariosListPage() {
       <ul className="plain-list" style={{ gap: 10 }}>
         {progress.map(({ scenario, completed, total }) => {
           const done = total > 0 && completed === total;
+          const Icon = iconForScenario(scenario.title_pt);
           return (
             <li key={scenario.id}>
               <Link to={`/scenarios/${scenario.id}`} className="list-row">
-                <div className="list-row-icon" />
+                <div className="list-row-icon">
+                  <Icon size={18} strokeWidth={1.75} />
+                </div>
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                   <span className="list-row-title">{scenario.title_pt}</span>
                   <span className="list-row-subtitle">
