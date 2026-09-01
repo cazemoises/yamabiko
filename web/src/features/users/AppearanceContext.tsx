@@ -9,7 +9,7 @@ import { getProfile, updateAppearance as patchAppearance } from "./api";
 export const ACCENT_PRESETS = [
   { id: "mono", label: "Mono", value: "mono", swatch: "#23201B" },
   { id: "verde-agua", label: "Verde-água", value: "#2F9E8F", swatch: "#2F9E8F" },
-  { id: "terracota", label: "Terracota", value: "#C1662F", swatch: "#C1662F" },
+  { id: "indigo", label: "Índigo", value: "#4B4A99", swatch: "#4B4A99" },
   { id: "ambar", label: "Âmbar", value: "#B98A2E", swatch: "#B98A2E" },
 ];
 

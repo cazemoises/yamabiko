@@ -147,12 +147,12 @@ export function VoiceSettingsPage() {
       <AppearanceSection />
 
       <span className="section-title">Voz de referência</span>
-      <div className="theme-toggle" role="group" aria-label="Idioma da voz">
+      <div className="segmented-toggle" role="group" aria-label="Idioma da voz">
         {LANGUAGES.map((lang) => (
           <button
             key={lang.value}
             type="button"
-            className={lang.value === language ? "theme-toggle-button active" : "theme-toggle-button"}
+            className={lang.value === language ? "segmented-toggle-button active" : "segmented-toggle-button"}
             aria-pressed={lang.value === language}
             onClick={() => setLanguage(lang.value)}
           >
