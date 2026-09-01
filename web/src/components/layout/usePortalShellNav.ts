@@ -63,9 +63,13 @@ export function usePortalShellNav(): void {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (status !== "authenticated") return;
     if (window.parent === window) return; // não está embutido, ninguém pra avisar
 
+    // Não esperar status === "authenticated": a navegação contextual é
+    // estrutura do app, não identidade — se /users/me demorar, falhar ou
+    // nunca resolver, o Portal fica preso em "Carregando navegação…" pra
+    // sempre (ver PORTAL_SHELL_PROTOCOL.md). Mesmo padrão do Ascend
+    // (useAscendShellNav.ts), que posta incondicionalmente.
     window.parent.postMessage(
       {
         channel: NAV_CHANNEL,
