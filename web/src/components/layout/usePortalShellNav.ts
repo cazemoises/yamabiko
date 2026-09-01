@@ -18,8 +18,11 @@ const TRUSTED_ORIGIN = window.location.origin;
 
 const NAV_ITEMS = [
   {
+    // id continua "home" (interno, o Portal nunca interpreta esse valor —
+    // ver PORTAL_SHELL_PROTOCOL.md); só o rótulo muda pra não colidir com o
+    // item "Home" que agora existe no nível Portal (Fase 1).
     id: "home",
-    label: "Home",
+    label: "Dashboard",
     path: "/",
     icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="12" height="12" rx="2.5"/></svg>',
   },
