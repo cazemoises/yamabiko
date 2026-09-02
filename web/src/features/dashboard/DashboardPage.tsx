@@ -59,7 +59,7 @@ export function DashboardPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="page-title">Progresso</span>
+        <span className="page-title">progresso</span>
       </div>
 
       <div className="stat-row">
@@ -81,7 +81,7 @@ export function DashboardPage() {
 
       {topPatterns.length > 0 && (
         <>
-          <span className="section-title">Padrões de erro mais comuns</span>
+          <span className="section-title">padrões de erro mais comuns</span>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {topPatterns.map((p) => (
               <div key={p.pattern} className="error-bar-row">
@@ -98,7 +98,7 @@ export function DashboardPage() {
 
       {recent.length > 0 && (
         <>
-          <span className="section-title">Tentativas recentes</span>
+          <span className="section-title">tentativas recentes</span>
           <div>
             {recent.map((attempt) => (
               <div key={attempt.id} className="recent-attempt-row">

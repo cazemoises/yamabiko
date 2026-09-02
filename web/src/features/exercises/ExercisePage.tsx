@@ -95,24 +95,24 @@ export function ExercisePage() {
           {passedInScenario ? (
             nextExercise ? (
               <button type="button" className="btn-primary" onClick={handleNext}>
-                Próximo →
+                próximo →
               </button>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                 <p style={{ fontWeight: 700, color: "var(--text)" }}>🎉 Cenário concluído!</p>
                 <Link to="/exercises" style={{ fontSize: 13 }}>
-                  Voltar aos exercícios
+                  voltar aos exercícios
                 </Link>
               </div>
             )
           ) : !answered ? (
             <button type="button" className="btn-primary" onClick={handleRetry}>
-              Tentar de novo
+              tentar de novo
             </button>
           ) : null}
 
           {exercise.exercise_type === "audio_pronunciation" && (
-            <SpeakButton exerciseId={exercise.id} label="Ouvir pronúncia esperada" />
+            <SpeakButton exerciseId={exercise.id} label="ouvir pronúncia esperada" />
           )}
         </div>
       )}

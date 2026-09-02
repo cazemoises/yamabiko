@@ -1,3 +1,6 @@
+/* Fonte de verdade: ../../../portal/design/tokens.json (v1, 2026-09-01) — não
+   editar valor aqui sem atualizar lá primeiro. Ver DESIGN_TOKENS.md pro
+   racional de cada token. */
 /* Sistema visual importado do design Yamabiko.dc.html (claude.ai/design,
    projeto c66cb199-1083-4b66-8d10-ec8fc60be837) — monocromático estilo
    Notion com um único acento configurável. Tokens derivados via color-mix()
@@ -8,15 +11,15 @@
    panel pro preview claro — extrapolação nossa, documentada em
    BUILD_STATE.md. */
 :root {
-  --bg: #faf8f5;
+  --bg: #f6f7fa;
   --bg-card: #ffffff;
-  --bg-sunken: #f1eee9;
-  --border: #e7e2da;
-  --divider: #efeae2;
-  --text: #23201b;
-  --text-secondary: #6f6a62;
-  --text-tertiary: #8a837a;
-  --text-faint: #a79e92;
+  --bg-sunken: #eef0f5;
+  --border: #dfe3ea;
+  --divider: #eef0f5;
+  --text: #1a1c23;
+  --text-secondary: #5b6072;
+  --text-tertiary: #7d8296;
+  --text-faint: #9aa0b4;
   --shadow-card: 0 20px 40px -24px rgba(35, 32, 27, 0.25);
 
   --mix-base: white;
@@ -35,9 +38,11 @@
 
   --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --jp: "Noto Sans JP", "Inter", ui-sans-serif, sans-serif;
-  --radius-card: 16px;
-  --radius-control: 13px;
-  --radius-chip: 20px;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --radius-chip: 14px;
 
   color-scheme: light;
   color: var(--text);
@@ -61,15 +66,15 @@
    users.theme). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --bg: #1b1815;
-    --bg-card: #242019;
-    --bg-sunken: #18150f;
-    --border: #38322a;
-    --divider: #2f2a22;
-    --text: #f2ece4;
-    --text-secondary: #a79e92;
-    --text-tertiary: #8a8074;
-    --text-faint: #736c61;
+    --bg: #14151b;
+    --bg-card: #1c1e26;
+    --bg-sunken: #101116;
+    --border: #2c2f3a;
+    --divider: #262935;
+    --text: #eceef3;
+    --text-secondary: #a2a7ba;
+    --text-tertiary: #7d8296;
+    --text-faint: #5b6072;
     --shadow-card: 0 20px 40px -24px rgba(0, 0, 0, 0.5);
     --mix-base: black;
     --accent-soft: color-mix(in srgb, var(--accent-base) 22%, var(--mix-base));
@@ -82,15 +87,15 @@
 /* data-theme explícito sempre vence a preferência do SO, nos dois sentidos
    (claro forçado num SO escuro, ou vice-versa). */
 :root[data-theme="dark"] {
-  --bg: #1b1815;
-  --bg-card: #242019;
-  --bg-sunken: #18150f;
-  --border: #38322a;
-  --divider: #2f2a22;
-  --text: #f2ece4;
-  --text-secondary: #a79e92;
-  --text-tertiary: #8a8074;
-  --text-faint: #736c61;
+  --bg: #14151b;
+  --bg-card: #1c1e26;
+  --bg-sunken: #101116;
+  --border: #2c2f3a;
+  --divider: #262935;
+  --text: #eceef3;
+  --text-secondary: #a2a7ba;
+  --text-tertiary: #7d8296;
+  --text-faint: #5b6072;
   --shadow-card: 0 20px 40px -24px rgba(0, 0, 0, 0.5);
   --mix-base: black;
   --accent-soft: color-mix(in srgb, var(--accent-base) 22%, var(--mix-base));
@@ -126,6 +131,7 @@ h2,
 h3 {
   color: var(--text);
   font-weight: 700;
+  font-family: var(--font-display);
   margin: 0;
 }
 
@@ -396,6 +402,7 @@ textarea {
   border: none;
   font-size: 14px;
   font-weight: 700;
+  font-family: var(--font-display);
   width: 100%;
 }
 
@@ -411,6 +418,7 @@ textarea {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
+  font-family: var(--font-display);
   width: 100%;
 }
 
@@ -937,6 +945,7 @@ textarea {
   font-size: 19px;
   font-weight: 800;
   color: var(--text);
+  font-family: var(--font-display);
 }
 
 .page-subtitle {
@@ -999,6 +1008,7 @@ textarea {
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
+  font-family: var(--font-display);
 }
 
 .error-bar-row {

@@ -21,7 +21,7 @@ interface SpeakButtonProps {
 // documentado em BUILD_STATE.md).
 export function SpeakButton({
   exerciseId,
-  label = "🔊 Ouvir pronúncia esperada",
+  label = "🔊 ouvir pronúncia esperada",
   className,
   baseClassName = "speak-button",
 }: SpeakButtonProps) {

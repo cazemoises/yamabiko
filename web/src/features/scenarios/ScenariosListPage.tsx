@@ -15,7 +15,7 @@ export function ScenariosListPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="page-title">Cenários</span>
+        <span className="page-title">cenários</span>
         <LanguageToggle language={language} onChange={setLanguage} />
       </div>
 

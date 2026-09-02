@@ -22,31 +22,31 @@ const NAV_ITEMS = [
     // ver PORTAL_SHELL_PROTOCOL.md); só o rótulo muda pra não colidir com o
     // item "Home" que agora existe no nível Portal (Fase 1).
     id: "home",
-    label: "Dashboard",
+    label: "dashboard",
     path: "/",
     icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="12" height="12" rx="2.5"/></svg>',
   },
   {
     id: "scenarios",
-    label: "Cenários",
+    label: "cenários",
     path: "/scenarios",
     icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="6" height="6" rx="1.4"/><rect x="10" y="2" width="6" height="6" rx="1.4"/><rect x="2" y="10" width="6" height="6" rx="1.4"/><rect x="10" y="10" width="6" height="6" rx="1.4"/></svg>',
   },
   {
     id: "exercises",
-    label: "Exercícios",
+    label: "exercícios",
     path: "/exercises",
     icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="9" cy="7" r="4"/><line x1="9" y1="11" x2="9" y2="15"/></svg>',
   },
   {
     id: "dashboard",
-    label: "Progresso",
+    label: "progresso",
     path: "/dashboard",
     icon: '<svg viewBox="0 0 18 18" fill="currentColor" stroke="none"><rect x="2" y="8" width="3" height="8"/><rect x="7.5" y="4" width="3" height="12"/><rect x="13" y="10" width="3" height="6"/></svg>',
   },
   {
     id: "voice",
-    label: "Voz",
+    label: "voz",
     path: "/settings/voice",
     icon: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="9" cy="9" r="3"/><circle cx="9" cy="9" r="7" stroke-width="1"/></svg>',
   },

@@ -27,7 +27,7 @@ function AppearanceSection() {
 
   return (
     <div className="appearance-section">
-      <span className="section-title">Aparência</span>
+      <span className="section-title">aparência</span>
 
       <div className="accent-swatches">
         {ACCENT_PRESETS.map((preset) => (
@@ -141,12 +141,12 @@ export function VoiceSettingsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="page-title">Configurações</span>
+        <span className="page-title">configurações</span>
       </div>
 
       <AppearanceSection />
 
-      <span className="section-title">Voz de referência</span>
+      <span className="section-title">voz de referência</span>
       <div className="segmented-toggle" role="group" aria-label="Idioma da voz">
         {LANGUAGES.map((lang) => (
           <button
@@ -183,7 +183,7 @@ export function VoiceSettingsPage() {
                     onClick={() => preview(voice.id)}
                     disabled={previewingId === voice.id}
                   >
-                    {previewingId === voice.id ? "..." : "▶ Ouvir"}
+                    {previewingId === voice.id ? "..." : "▶ ouvir"}
                   </button>
                   <button
                     type="button"

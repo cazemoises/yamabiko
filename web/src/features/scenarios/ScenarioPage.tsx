@@ -54,7 +54,7 @@ export function ScenarioPage() {
 
       {firstIncomplete && (
         <Link to={`/exercises/${firstIncomplete.id}`} className="btn-primary" style={{ textDecoration: "none" }}>
-          Continuar
+          continuar
         </Link>
       )}
 

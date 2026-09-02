@@ -27,7 +27,7 @@ export function ExercisesListPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <span className="page-title">Exercícios</span>
+        <span className="page-title">exercícios</span>
         <LanguageToggle language={language} onChange={setLanguage} />
       </div>
       <p className="page-subtitle">Frases avulsas, fora de um cenário</p>

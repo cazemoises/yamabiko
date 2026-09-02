@@ -64,7 +64,7 @@ export function HomePage() {
             />
           </div>
           <span className="btn-primary" style={{ alignSelf: "flex-start", width: "auto" }}>
-            Continuar
+            continuar
           </span>
         </Link>
       )}
@@ -76,7 +76,7 @@ export function HomePage() {
       {featured.length > 0 && (
         <>
           <div className="page-header">
-            <span className="section-title">Em destaque</span>
+            <span className="section-title">em destaque</span>
             <Link to="/scenarios" className="page-subtitle">
               ver todos
             </Link>
